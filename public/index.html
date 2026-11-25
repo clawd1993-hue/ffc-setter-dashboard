@@ -86,6 +86,19 @@
   .bm .del:hover{color:#D93025;}
   .bm-add{width:100%;border:1px dashed var(--line);background:#fff;color:var(--blue);border-radius:10px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;}
   .bm-add:hover{background:var(--blue-soft);}
+  /* --- on-theme modal --- */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(28,30,33,.45);z-index:100;align-items:center;justify-content:center;}
+  .modal-overlay.show{display:flex;}
+  .modal{background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.28);width:420px;max-width:calc(100vw - 40px);overflow:hidden;animation:modalPop .14s ease-out;}
+  @keyframes modalPop{from{opacity:0;transform:translateY(8px) scale(.98);}to{opacity:1;transform:none;}}
+  .modal-head{padding:18px 22px 4px;font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;}
+  .modal-body{padding:12px 22px 4px;}
+  .modal-body label{display:block;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin:10px 0 6px;font-weight:600;}
+  .modal-body textarea,.modal-body input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:var(--bg);transition:.12s;}
+  .modal-body textarea{resize:none;min-height:88px;line-height:1.4;}
+  .modal-body textarea:focus,.modal-body input:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px var(--blue-soft);}
+  .modal-foot{padding:14px 22px 18px;display:flex;justify-content:flex-end;gap:10px;}
+  .modal-foot .btn{padding:9px 18px;border-radius:20px;}
 </style>
 </head>
 <body>
@@ -98,6 +111,22 @@
   <div class="thread" id="thread"><div class="empty">Select a conversation</div></div>
 
   <div class="panel" id="panel"></div>
+
+  <div class="modal-overlay" id="savedModal">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">⭐ New saved message</div>
+      <div class="modal-body">
+        <label for="sm-text">Message</label>
+        <textarea id="sm-text" placeholder="Type the reply you want to save..."></textarea>
+        <label for="sm-title">Short label <span style="text-transform:none;color:var(--muted);font-weight:400">(optional)</span></label>
+        <input id="sm-title" type="text" placeholder="e.g. Booking link ask" autocomplete="off">
+      </div>
+      <div class="modal-foot">
+        <button class="btn ghost" onclick="closeSavedModal()">Cancel</button>
+        <button class="btn send" onclick="submitSavedModal()">Save</button>
+      </div>
+    </div>
+  </div>
 
 <script>
 let LIST=[], CUR=null, FILTER='';
@@ -227,12 +256,28 @@ function useCanned(id){
   const r=document.getElementById('reply'); if(r){ r.value=c.text; r.focus(); }
   const menu=document.getElementById('cannedmenu'); if(menu)menu.style.display='none';
 }
-async function addCanned(){
-  const text=prompt('Saved message text:'); if(!text||!text.trim())return;
-  const title=prompt('Short label (optional):')||'';
-  await fetch('/api/canned',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text.trim(),title:title.trim()})});
-  CANNED=null; const menu=document.getElementById('cannedmenu'); if(menu)menu.style.display='none';
+function addCanned(){
+  const menu=document.getElementById('cannedmenu'); if(menu)menu.style.display='none';
+  document.getElementById('sm-text').value='';
+  document.getElementById('sm-title').value='';
+  document.getElementById('savedModal').classList.add('show');
+  setTimeout(()=>document.getElementById('sm-text').focus(),30);
 }
+function closeSavedModal(){document.getElementById('savedModal').classList.remove('show');}
+async function submitSavedModal(){
+  const text=document.getElementById('sm-text').value;
+  const title=document.getElementById('sm-title').value;
+  if(!text||!text.trim()){document.getElementById('sm-text').focus();return;}
+  await fetch('/api/canned',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text.trim(),title:(title||'').trim()})});
+  CANNED=null; closeSavedModal();
+  if(CUR)openCanned(CUR); // reopen fresh list showing the new one
+}
+// close modal on overlay click or Escape
+document.getElementById('savedModal').addEventListener('click',e=>{if(e.target.id==='savedModal')closeSavedModal();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeSavedModal();
+  if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)&&document.getElementById('savedModal').classList.contains('show'))submitSavedModal();
+});
 async function delCanned(id){
   if(!confirm('Delete this saved message?'))return;
   await fetch('/api/canned/'+id,{method:'DELETE'});
