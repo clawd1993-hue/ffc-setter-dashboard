@@ -49,6 +49,11 @@
   .flowitem{padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;}
   .flowitem:hover{background:var(--blue-soft);}
   .flowitem.muted{color:var(--muted);cursor:default;}
+  .flowitem.add{color:var(--blue);font-weight:600;border-top:1px solid var(--line);margin-top:4px;}
+  .flowitem .del{float:right;color:var(--muted);font-weight:700;padding:0 4px;}
+  .flowitem .del:hover{color:#D93025;}
+  .canned-btn{background:#fff;border:1px solid var(--line);color:var(--blue);font-size:15px;padding:8px 12px;line-height:1;}
+  .canned-btn:hover{background:var(--blue-soft);}
   .ai-suggest{background:var(--blue-soft);border:1px solid #CCE4FF;border-radius:12px;padding:12px 14px;margin-bottom:10px;}
   .ai-suggest .label{font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
   .ai-suggest .txt{font-size:14px;line-height:1.45;}
@@ -135,8 +140,10 @@ async function open_(id,keepDraft){
           <button class="btn skip" onclick="setMode('${c.id}','approve')">Skip / take over</button>
         </div></div>`:''}
       <div id="flowmenu" class="flowmenu"></div>
+      <div id="cannedmenu" class="flowmenu"></div>
       <div class="inputrow">
         <button class="btn auto-btn" title="Fire an automation" onclick="openFlows('${c.id}')">⚡</button>
+        <button class="btn canned-btn" title="Saved messages" onclick="openCanned('${c.id}')">⭐</button>
         <input id="reply" autocomplete="off" placeholder="Type your own reply..." onkeydown="if(event.key==='Enter')send('${c.id}',this.value)">
         <button class="btn send" onclick="send('${c.id}',document.getElementById('reply').value)">Send</button>
       </div>
@@ -157,6 +164,7 @@ async function open_(id,keepDraft){
 }
 let FLOWS=null;
 async function openFlows(id){
+  const cm=document.getElementById('cannedmenu'); if(cm)cm.style.display='none';
   const menu=document.getElementById('flowmenu'); if(!menu)return;
   if(menu.style.display==='block'){ menu.style.display='none'; return; }
   if(!FLOWS){ try{ const r=await (await fetch('/api/flows')).json(); FLOWS=(r.data&&r.data.flows)||[]; }catch(e){ FLOWS=[]; } }
@@ -172,6 +180,36 @@ async function fireFlow(id,i){
   const r=await (await fetch('/api/fire-flow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,flow_ns:f.ns,name:f.name})})).json();
   if(r&&r.blocked){ alert('Sending is OFF — automation NOT fired.'); return; }
   open_(id);
+}
+let CANNED=null;
+async function loadCanned(force){ if(CANNED&&!force)return CANNED; try{ CANNED=await (await fetch('/api/canned')).json(); }catch(e){ CANNED=[]; } return CANNED; }
+async function openCanned(id){
+  const fm=document.getElementById('flowmenu'); if(fm)fm.style.display='none';
+  const menu=document.getElementById('cannedmenu'); if(!menu)return;
+  if(menu.style.display==='block'){ menu.style.display='none'; return; }
+  await loadCanned(true);
+  menu.innerHTML='<div class="flowhead">⭐ Saved messages</div>'+
+    (CANNED.length?CANNED.map(c=>`<div class="flowitem" onclick="useCanned(${c.id})"><span class="del" title="Delete" onclick="event.stopPropagation();delCanned(${c.id})">✕</span>${esc(c.title||c.text.slice(0,40))}</div>`).join('')
+                  :'<div class="flowitem muted">No saved messages yet</div>')+
+    '<div class="flowitem add" onclick="addCanned()">+ Add saved message</div>';
+  menu.style.display='block';
+}
+function useCanned(id){
+  const c=CANNED&&CANNED.find(x=>x.id===id); if(!c)return;
+  const r=document.getElementById('reply'); if(r){ r.value=c.text; r.focus(); }
+  const menu=document.getElementById('cannedmenu'); if(menu)menu.style.display='none';
+}
+async function addCanned(){
+  const text=prompt('Saved message text:'); if(!text||!text.trim())return;
+  const title=prompt('Short label (optional):')||'';
+  await fetch('/api/canned',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text.trim(),title:title.trim()})});
+  CANNED=null; const menu=document.getElementById('cannedmenu'); if(menu)menu.style.display='none';
+}
+async function delCanned(id){
+  if(!confirm('Delete this saved message?'))return;
+  await fetch('/api/canned/'+id,{method:'DELETE'});
+  const menu=document.getElementById('cannedmenu'); if(menu)menu.style.display='none';
+  if(CUR)openCanned(CUR); // reopen fresh list
 }
 async function send(id,text){ if(!text||!text.trim())return;
   await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,text:text.trim()})});

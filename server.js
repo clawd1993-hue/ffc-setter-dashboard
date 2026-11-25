@@ -224,6 +224,26 @@ app.get('/api/flows', async (_req, res) => {
   res.json(await r.json().catch(() => ({ ok: r.ok })));
 });
 
+// ---------- canned / saved responses (stored in Supabase) ----------
+const SB_CANNED = 'ffc_saved_replies';
+app.get('/api/canned', async (_req, res) => {
+  if (!USE_DB) return res.json([]);
+  try { res.json(await sb(`${SB_CANNED}?select=id,title,text&order=created_at.asc`) || []); }
+  catch (e) { res.json([]); }
+});
+app.post('/api/canned', async (req, res) => {
+  const text = (req.body && req.body.text || '').trim(); if (!text) return res.status(400).json({ error: 'empty' });
+  const title = (req.body && req.body.title || '').trim();
+  if (!USE_DB) return res.status(503).json({ error: 'no db' });
+  try { await sb(SB_CANNED, { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ title, text }) }); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/canned/:id', async (req, res) => {
+  if (!USE_DB) return res.status(503).json({ error: 'no db' });
+  try { await sb(`${SB_CANNED}?id=eq.${encodeURIComponent(req.params.id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/health', (_req, res) => res.json({ ok: true, manychat: !!MANYCHAT_TOKEN, brain: !!ANTHROPIC_API_KEY, db: USE_DB, convos: db.conversations.length }));
 
 bootLoad().finally(() => {
