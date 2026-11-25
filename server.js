@@ -261,6 +261,28 @@ app.delete('/api/canned/:id', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ---------- bookmarks (setter quick links, stored in Supabase) ----------
+const SB_BM = 'ffc_bookmarks';
+app.get('/api/bookmarks', async (_req, res) => {
+  if (!USE_DB) return res.json([]);
+  try { res.json(await sb(`${SB_BM}?select=id,label,url&order=sort.asc,created_at.asc`) || []); }
+  catch (e) { res.json([]); }
+});
+app.post('/api/bookmarks', async (req, res) => {
+  const label = (req.body && req.body.label || '').trim();
+  let url = (req.body && req.body.url || '').trim();
+  if (!label || !url) return res.status(400).json({ error: 'label and url required' });
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  if (!USE_DB) return res.status(503).json({ error: 'no db' });
+  try { await sb(SB_BM, { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ label, url }) }); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/bookmarks/:id', async (req, res) => {
+  if (!USE_DB) return res.status(503).json({ error: 'no db' });
+  try { await sb(`${SB_BM}?id=eq.${encodeURIComponent(req.params.id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/health', (_req, res) => res.json({ ok: true, manychat: !!MANYCHAT_TOKEN, brain: !!ANTHROPIC_API_KEY, db: USE_DB, convos: db.conversations.length }));
 
 bootLoad().finally(() => {
