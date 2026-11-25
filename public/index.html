@@ -152,7 +152,6 @@ async function open_(id,keepDraft){
         <div class="ai-actions">
           <button class="btn send" onclick="send('${c.id}',document.getElementById('sugtxt').textContent)">Send ✓</button>
           <button class="btn ghost" onclick="document.getElementById('reply').value=document.getElementById('sugtxt').textContent;document.getElementById('reply').focus()">Edit</button>
-          <button class="btn skip" onclick="setMode('${c.id}','approve')">Skip / take over</button>
         </div></div>`:''}
       <div id="flowmenu" class="flowmenu"></div>
       <div id="cannedmenu" class="flowmenu"></div>
