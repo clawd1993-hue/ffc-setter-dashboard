@@ -48,7 +48,8 @@
   .thread{flex:1;display:flex;flex-direction:column;background:#fff;}
   .thread-head{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;min-height:66px;}
   .thread-head .name{font-weight:700;font-size:16px;}
-  .thread-head .sub{color:var(--muted);font-size:12px;}
+  .thread-head .realname{color:var(--text);font-size:12.5px;font-weight:600;margin-top:1px;}
+  .thread-head .sub{color:var(--muted);font-size:12px;margin-top:1px;}
   .mode-toggle{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
   .switch{position:relative;width:150px;height:30px;background:var(--bg);border:1px solid var(--line);border-radius:16px;cursor:pointer;font-size:12px;font-weight:600;display:flex;}
   .switch div{flex:1;display:flex;align-items:center;justify-content:center;border-radius:14px;margin:3px;color:var(--muted);transition:.15s;}
@@ -239,7 +240,11 @@ async function open_(id,keepDraft){
   document.getElementById('thread').innerHTML=`
     <div class="thread-head">
       <div class="avatar" style="background:${c.avatarColor};width:38px;height:38px;flex:0 0 38px;font-size:14px;">${esc((c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2))}</div>
-      <div><div class="name">${esc(c.name)}</div><div class="sub">${c.email?'✉️ '+esc(c.email):esc(c.channel)}</div></div>
+      <div>
+        <div class="name">${esc(c.name)}</div>
+        ${c.realName?`<div class="realname" title="Real name from checkout (GHL)">👤 ${esc(c.realName)}</div>`:''}
+        <div class="sub">${c.email?'✉️ '+esc(c.email):esc(c.channel)}</div>
+      </div>
       ${c.closed
         ?`<button class="btn reopen-lead" onclick="reopenLead('${c.id}')" title="Move back to the active inbox">↩︎ Reopen</button>`
         :`<button class="btn close-lead" onclick="askCloseLead('${c.id}','${esc(c.name).replace(/'/g,"\\'")}')">Close Lead</button>`}

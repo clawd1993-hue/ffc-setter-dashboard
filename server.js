@@ -27,6 +27,10 @@ const AUTO_SEND_ENABLED = (process.env.AUTO_SEND_ENABLED || '').toLowerCase() ==
 const MANYCHAT_TOKEN = process.env.MANYCHAT_TOKEN || '';        // Pro plan, Settings -> API
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';  // reuse ours
 const MC_BASE = 'https://api.manychat.com';
+// GHL — look up the lead's REAL checkout name by email (ManyChat name is often a nickname)
+const GHL_API_KEY = process.env.GHL_API_KEY || '';
+const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || 'tXCdfKQO75A9wknq5eOa';
+const GHL_BASE = 'https://services.leadconnectorhq.com';
 const STORE = path.join(__dirname, 'conversations.json');
 
 // ---------- Supabase (persistent store, survives deploys) ----------
@@ -143,6 +147,28 @@ async function enrichEmail(c) {
     if (d) { if (d.email) c.email = d.email; if (!c.handle && d.user_name) c.handle = '@' + d.user_name; touch(c); }
   } catch (e) {}
 }
+// title-case a name GHL stores lowercase ("craig dunnicliff" -> "Craig Dunnicliff")
+const tc = s => (s || '').trim().replace(/\b\w/g, m => m.toUpperCase());
+// look up the lead's REAL name from their checkout record in GHL (matched by email) — cache on convo
+async function enrichRealName(c) {
+  if (!c || !GHL_API_KEY || c.realNameChecked) return;
+  if (!c.email) return; // need an email to match on
+  try {
+    const url = `${GHL_BASE}/contacts/?locationId=${GHL_LOCATION_ID}&query=${encodeURIComponent(c.email)}&limit=5`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${GHL_API_KEY}`, Version: '2021-07-28' } });
+    const d = await r.json().catch(() => null);
+    const email = (c.email || '').toLowerCase();
+    const hit = (d && d.contacts || []).find(x => (x.email || '').toLowerCase() === email) || (d && d.contacts || [])[0];
+    c.realNameChecked = true;
+    if (hit) {
+      const first = tc(hit.firstName || '');
+      const full = tc([hit.firstName, hit.lastName].filter(Boolean).join(' ') || hit.contactName || '');
+      if (first) c.firstName = first;
+      if (full) c.realName = full;
+    }
+    touch(c);
+  } catch (e) { c.realNameChecked = true; }
+}
 
 // ---------- brain (suggestion) — real Claude if key, else stub ----------
 async function suggest(c) {
@@ -205,6 +231,7 @@ app.get('/api/conversations', (_req, res) =>
 app.get('/api/conversation/:id', async (req, res) => {
   const c = convo(req.params.id); if (!c) return res.status(404).json({ error: 'not found' });
   if (!c.email) await enrichEmail(c); // backfill email on open
+  if (!c.realNameChecked) await enrichRealName(c); // backfill real checkout name from GHL
   res.json(c);
 });
 
