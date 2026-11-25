@@ -200,7 +200,7 @@ app.post('/manychat/inbound', async (req, res) => {
 
 // 2) dashboard feeds
 app.get('/api/conversations', (_req, res) =>
-  res.json(db.conversations.map(c => ({ id: c.id, name: c.name, handle: c.handle, channel: c.channel, avatarColor: c.avatarColor, mode: c.mode, tag: c.tag, updated: c.updated, preview: (c.messages.at(-1) || {}).text || '' }))));
+  res.json(db.conversations.map(c => ({ id: c.id, name: c.name, handle: c.handle, channel: c.channel, avatarColor: c.avatarColor, mode: c.mode, tag: c.tag, closed: !!c.closed, updated: c.updated, preview: (c.messages.at(-1) || {}).text || '' }))));
 
 app.get('/api/conversation/:id', async (req, res) => {
   const c = convo(req.params.id); if (!c) return res.status(404).json({ error: 'not found' });
@@ -232,6 +232,13 @@ app.post('/api/mode', (req, res) => {
   const { id, mode } = req.body; const c = convo(id); if (!c) return res.status(404).json({ error: 'not found' });
   c.mode = mode === 'auto' ? 'auto' : 'approve'; c.tag = c.mode === 'auto' ? 'auto' : 'review'; touch(c);
   res.json({ ok: true, mode: c.mode });
+});
+
+// 6) close / reopen a lead (moves them to the Closed list)
+app.post('/api/close', (req, res) => {
+  const { id, closed } = req.body; const c = convo(id); if (!c) return res.status(404).json({ error: 'not found' });
+  c.closed = closed === false ? false : true; touch(c);
+  res.json({ ok: true, closed: c.closed });
 });
 
 // list saved flows (so we can grab flow_ns ids) — pass-through

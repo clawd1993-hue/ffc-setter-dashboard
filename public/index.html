@@ -21,6 +21,13 @@
   .tab.email{color:#B8860B;background:#FEF3D9;}
   .tab.email:hover{background:#fbe9bd;}
   .tab.email.on{background:#B8860B;color:#fff;}
+  .tab.closedtab{color:var(--muted);}
+  .tab.closedtab.on{background:#65676B;color:#fff;}
+  .close-lead{background:#fff;border:1px solid #F3C2BC;color:#D93025;margin-left:12px;padding:6px 12px;}
+  .close-lead:hover{background:#FDECEA;}
+  .reopen-lead{background:#fff;border:1px solid var(--line);color:var(--muted);margin-left:12px;padding:6px 12px;}
+  .reopen-lead:hover{background:var(--bg);color:var(--text);}
+  .modal-sub{padding:0 22px;font-size:13px;color:var(--muted);line-height:1.5;}
   .convos{overflow-y:auto;flex:1;}
   .convo{display:flex;gap:10px;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--line);}
   .convo:hover{background:#fafbfc;}
@@ -78,6 +85,8 @@
   .btn.send{background:var(--blue);color:#fff;}
   .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--text);}
   .btn.skip{background:#fff;border:1px solid var(--line);color:var(--muted);margin-left:auto;}
+  .btn.danger{background:#D93025;color:#fff;}
+  .btn.danger:hover{background:#b7271d;}
   .inputrow{display:flex;gap:10px;align-items:center;}
   .inputrow input{flex:1;padding:10px 14px;border:1px solid var(--line);border-radius:20px;outline:none;font-size:14px;}
   .panel{width:260px;background:#fff;border-left:1px solid var(--line);padding:20px;overflow-y:auto;}
@@ -155,10 +164,21 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="closeModal">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">Close this lead?</div>
+      <div class="modal-sub">Are you sure you want to close <b id="close-name">this lead</b>? They'll be moved to the <b>Closed</b> list. You can reopen them anytime.</div>
+      <div class="modal-foot">
+        <button class="btn ghost" onclick="closeCloseModal()">Cancel</button>
+        <button class="btn danger" onclick="confirmCloseLead()">Close Lead</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 let LIST=[], CUR=null, FILTER='', TAB='all';
 const TABS=[['all','All'],['review','Needs review'],['replied','Replied'],
-  ['fu1','FU1'],['fu2','FU2'],['fu3','FU3'],['fue1','FUE1'],['fu4','FU4'],['fue2','FUE2'],['fu5','FU5'],['fue3','FUE3']];
+  ['fu1','FU1'],['fu2','FU2'],['fu3','FU3'],['fue1','FUE1'],['fu4','FU4'],['fue2','FUE2'],['fu5','FU5'],['fue3','FUE3'],['closed','Closed']];
 const tagOf=c=>c.tag||'review';
 function setTab(t){TAB=t;loadList();}
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -167,16 +187,19 @@ const ago=t=>{const s=(Date.now()-t)/1000;if(s<60)return'now';if(s<3600)return M
 async function loadList(){
   LIST=await (await fetch('/api/conversations')).json();
   LIST.sort((a,b)=>b.updated-a.updated);
-  document.getElementById('count').textContent=LIST.length;
+  const active=LIST.filter(c=>!c.closed);
+  document.getElementById('count').textContent=active.length;
   const q=FILTER.toLowerCase();
-  // render filter tabs with live counts
-  const counts={}; LIST.forEach(c=>{const t=tagOf(c);counts[t]=(counts[t]||0)+1;});
+  // render filter tabs with live counts (closed leads only counted under Closed)
+  const counts={}; active.forEach(c=>{const t=tagOf(c);counts[t]=(counts[t]||0)+1;});
+  counts.closed=LIST.filter(c=>c.closed).length;
   document.getElementById('tabs').innerHTML=TABS.map(([k,lbl])=>{
-    const n=k==='all'?LIST.length:(counts[k]||0);
-    const em=k.startsWith('fue')?' email':'';
-    return `<div class="tab${em} ${TAB===k?'on':''}" onclick="setTab('${k}')">${lbl}<span class="cnt">${n}</span></div>`;
+    const n=k==='all'?active.length:(counts[k]||0);
+    const cls=k==='closed'?' closedtab':(k.startsWith('fue')?' email':'');
+    return `<div class="tab${cls} ${TAB===k?'on':''}" onclick="setTab('${k}')">${lbl}<span class="cnt">${n}</span></div>`;
   }).join('');
-  document.getElementById('convos').innerHTML=LIST.filter(c=>(TAB==='all'||tagOf(c)===TAB)&&(!q||(c.name+c.preview).toLowerCase().includes(q))).map(c=>`
+  const matchTab=c=>TAB==='closed'?c.closed:(!c.closed&&(TAB==='all'||tagOf(c)===TAB));
+  document.getElementById('convos').innerHTML=LIST.filter(c=>matchTab(c)&&(!q||(c.name+c.preview).toLowerCase().includes(q))).map(c=>`
     <div class="convo ${c.id===CUR?'active':''}" onclick="open_('${c.id}')">
       <div class="avatar" style="background:${c.avatarColor}">${esc((c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2))}</div>
       <div class="meta">
@@ -204,6 +227,9 @@ async function open_(id,keepDraft){
     <div class="thread-head">
       <div class="avatar" style="background:${c.avatarColor};width:38px;height:38px;flex:0 0 38px;font-size:14px;">${esc((c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2))}</div>
       <div><div class="name">${esc(c.name)}</div><div class="sub">${c.email?'✉️ '+esc(c.email):esc(c.channel)}</div></div>
+      ${c.closed
+        ?`<button class="btn reopen-lead" onclick="reopenLead('${c.id}')" title="Move back to the active inbox">↩︎ Reopen</button>`
+        :`<button class="btn close-lead" onclick="askCloseLead('${c.id}','${esc(c.name).replace(/'/g,"\\'")}')">Close Lead</button>`}
       <div class="mode-toggle" title="Goal: full auto mode (locked for now)">Mode:
         <div class="switch disabled">
           <div class="${c.mode==='approve'?'on':''}">Approve</div>
@@ -310,10 +336,32 @@ async function submitSavedModal(){
   CANNED=null; closeSavedModal();
   if(CUR)openCanned(CUR); // reopen fresh list showing the new one
 }
+// ---- close / reopen lead ----
+let CLOSE_ID=null;
+function askCloseLead(id,name){
+  CLOSE_ID=id;
+  document.getElementById('close-name').textContent=name||'this lead';
+  document.getElementById('closeModal').classList.add('show');
+}
+function closeCloseModal(){document.getElementById('closeModal').classList.remove('show');CLOSE_ID=null;}
+async function confirmCloseLead(){
+  if(!CLOSE_ID)return;
+  const id=CLOSE_ID;
+  await fetch('/api/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,closed:true})});
+  closeCloseModal(); CUR=null;
+  document.getElementById('thread').innerHTML='<div class="empty">Lead closed — moved to the Closed list</div>';
+  loadList();
+}
+async function reopenLead(id){
+  await fetch('/api/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,closed:false})});
+  open_(id);
+}
+document.getElementById('closeModal').addEventListener('click',e=>{if(e.target.id==='closeModal')closeCloseModal();});
+
 // close modal on overlay click or Escape
 document.getElementById('savedModal').addEventListener('click',e=>{if(e.target.id==='savedModal')closeSavedModal();});
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeSavedModal();closeBmModal();}
+  if(e.key==='Escape'){closeSavedModal();closeBmModal();closeCloseModal();}
   if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)&&document.getElementById('savedModal').classList.contains('show'))submitSavedModal();
   if(e.key==='Enter'&&document.getElementById('bmModal').classList.contains('show')){e.preventDefault();submitBmModal();}
 });
