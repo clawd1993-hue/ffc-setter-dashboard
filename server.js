@@ -20,6 +20,8 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3461;
+// HARD SAFETY SWITCH: no message can leave to a lead unless this is explicitly 'on'.
+const SEND_ENABLED = (process.env.SEND_ENABLED || '').toLowerCase() === 'on';
 const MANYCHAT_TOKEN = process.env.MANYCHAT_TOKEN || '';        // Pro plan, Settings -> API
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';  // reuse ours
 const MC_BASE = 'https://api.manychat.com';
@@ -121,7 +123,7 @@ app.post('/manychat/inbound', async (req, res) => {
   const s = await suggest(c);
   c.suggestion = s; c.tag = c.mode === 'auto' ? 'auto' : 'review'; touch(c);
 
-  if (c.mode === 'auto') {
+  if (c.mode === 'auto' && SEND_ENABLED) {
     // AUTO: answer ManyChat directly with a Dynamic Block v2 (telegram supported)
     c.messages.push({ dir: 'out', text: s.text, t: Date.now() }); touch(c);
     return res.json({ version: 'v2', content: { type: 'telegram', messages: [{ type: 'text', text: s.text }] } });
@@ -143,6 +145,7 @@ app.get('/api/conversation/:id', (req, res) => {
 app.post('/api/send', async (req, res) => {
   const { id, text } = req.body; const c = convo(id); if (!c) return res.status(404).json({ error: 'not found' });
   const out = (text || (c.suggestion && c.suggestion.text) || '').trim(); if (!out) return res.status(400).json({ error: 'empty' });
+  if (!SEND_ENABLED) { return res.json({ ok: false, blocked: true, note: 'Sending is OFF (SEND_ENABLED not set). Nothing was sent to the lead.' }); }
   const r = await sendText(c.subscriber_id, out);
   c.messages.push({ dir: 'out', text: out, t: Date.now() }); c.suggestion = null; c.tag = 'auto'; touch(c);
   res.json({ ok: true, manychat: r });
