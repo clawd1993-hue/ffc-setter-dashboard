@@ -82,6 +82,7 @@
   .bm{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;text-decoration:none;color:var(--text);font-size:13px;font-weight:600;transition:.12s;}
   .bm:hover{background:var(--blue-soft);border-color:#CCE4FF;}
   .bm .ico{color:var(--blue);flex:0 0 auto;}
+  .bm img.ico{width:18px;height:18px;border-radius:4px;object-fit:contain;display:block;}
   .bm .lbl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .bm .del{color:var(--muted);font-weight:700;padding:0 2px;}
   .bm .del:hover{color:#D93025;}
@@ -311,12 +312,13 @@ async function setMode(id,mode){
   open_(id);
 }
 // ---- bookmarks panel (setter quick links) ----
+function favHost(u){try{return new URL(u).hostname;}catch(e){return (u||'').replace(/^https?:\/\//,'').split('/')[0];}}
 async function renderBookmarks(){
   const p=document.getElementById('panel'); if(!p)return;
   let bm=[]; try{ bm=await (await fetch('/api/bookmarks')).json(); }catch(e){}
   p.innerHTML='<h4 style="margin-top:0">🔖 Bookmarks</h4>'+
     (bm.length?bm.map(b=>`<a class="bm" href="${esc(b.url)}" target="_blank" rel="noopener">
-        <span class="ico">🔗</span><span class="lbl">${esc(b.label)}</span>
+        <img class="ico" src="https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(favHost(b.url))}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ico',textContent:'🔗'}))"><span class="lbl">${esc(b.label)}</span>
         <span class="del" title="Remove" onclick="event.preventDefault();event.stopPropagation();delBookmark(${b.id})">✕</span>
       </a>`).join(''):'<div style="color:var(--muted);font-size:12px;margin-bottom:8px">No bookmarks yet</div>')+
     '<button class="bm-add" onclick="addBookmark()">+ Add bookmark</button>';
