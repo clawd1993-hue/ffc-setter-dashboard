@@ -229,8 +229,17 @@ app.post('/manychat/inbound', async (req, res) => {
 });
 
 // 2) dashboard feeds
+// status is DERIVED from the last message: they messaged last -> "review" (needs reply);
+// we messaged last -> "replied". Explicit follow-up stages (fu1..fue3) are a separate pipeline and win.
+const PIPE_TAGS = ['fu1', 'fu2', 'fu3', 'fu4', 'fu5', 'fue1', 'fue2', 'fue3'];
+function statusOf(c) {
+  if (PIPE_TAGS.includes(c.tag)) return c.tag;     // a follow-up stage was explicitly set
+  const last = c.messages && c.messages.at(-1);
+  if (!last) return 'review';
+  return last.dir === 'out' ? 'replied' : 'review'; // out = we spoke last, in = waiting on us
+}
 app.get('/api/conversations', (_req, res) =>
-  res.json(db.conversations.map(c => ({ id: c.id, name: c.name, handle: c.handle, channel: c.channel, avatarColor: c.avatarColor, mode: c.mode, tag: c.tag, closed: !!c.closed, updated: c.updated, preview: (c.messages.at(-1) || {}).text || '' }))));
+  res.json(db.conversations.map(c => ({ id: c.id, name: c.name, handle: c.handle, channel: c.channel, avatarColor: c.avatarColor, mode: c.mode, tag: statusOf(c), closed: !!c.closed, updated: c.updated, preview: (c.messages.at(-1) || {}).text || '' }))));
 
 app.get('/api/conversation/:id', async (req, res) => {
   const c = convo(req.params.id); if (!c) return res.status(404).json({ error: 'not found' });
