@@ -20,8 +20,10 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3461;
-// HARD SAFETY SWITCH: no message can leave to a lead unless this is explicitly 'on'.
+// SEND_ENABLED: lets a HUMAN send from the dashboard (the Send button). Default off.
 const SEND_ENABLED = (process.env.SEND_ENABLED || '').toLowerCase() === 'on';
+// AUTO_SEND_ENABLED: lets the app AUTONOMOUSLY reply (Auto mode) with ZERO human. Default off, kept off.
+const AUTO_SEND_ENABLED = (process.env.AUTO_SEND_ENABLED || '').toLowerCase() === 'on';
 const MANYCHAT_TOKEN = process.env.MANYCHAT_TOKEN || '';        // Pro plan, Settings -> API
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';  // reuse ours
 const MC_BASE = 'https://api.manychat.com';
@@ -123,7 +125,7 @@ app.post('/manychat/inbound', async (req, res) => {
   const s = await suggest(c);
   c.suggestion = s; c.tag = c.mode === 'auto' ? 'auto' : 'review'; touch(c);
 
-  if (c.mode === 'auto' && SEND_ENABLED) {
+  if (c.mode === 'auto' && AUTO_SEND_ENABLED) {
     // AUTO: answer ManyChat directly with a Dynamic Block v2 (telegram supported)
     c.messages.push({ dir: 'out', text: s.text, t: Date.now() }); touch(c);
     return res.json({ version: 'v2', content: { type: 'telegram', messages: [{ type: 'text', text: s.text }] } });
