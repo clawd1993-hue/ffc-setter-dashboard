@@ -18,6 +18,9 @@
   .tab:hover{background:var(--blue-soft);}
   .tab.on{background:var(--blue);color:#fff;}
   .tab .cnt{opacity:.7;font-weight:700;margin-left:3px;}
+  .tab.email{color:#B8860B;background:#FEF3D9;}
+  .tab.email:hover{background:#fbe9bd;}
+  .tab.email.on{background:#B8860B;color:#fff;}
   .convos{overflow-y:auto;flex:1;}
   .convo{display:flex;gap:10px;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--line);}
   .convo:hover{background:#fafbfc;}
@@ -154,8 +157,9 @@
 
 <script>
 let LIST=[], CUR=null, FILTER='', TAB='all';
-const TABS=[['all','All'],['review','Needs review'],['replied','Replied'],['auto','Auto'],['hot','Hot']];
-const tagOf=c=>['auto','hot','replied'].includes(c.tag)?c.tag:'review';
+const TABS=[['all','All'],['review','Needs review'],['replied','Replied'],
+  ['fu1','FU1'],['fu2','FU2'],['fu3','FU3'],['fue1','FUE1'],['fu4','FU4'],['fue2','FUE2'],['fu5','FU5'],['fue3','FUE3']];
+const tagOf=c=>c.tag||'review';
 function setTab(t){TAB=t;loadList();}
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ago=t=>{const s=(Date.now()-t)/1000;if(s<60)return'now';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';return Math.floor(s/86400)+'d';};
@@ -169,7 +173,8 @@ async function loadList(){
   const counts={}; LIST.forEach(c=>{const t=tagOf(c);counts[t]=(counts[t]||0)+1;});
   document.getElementById('tabs').innerHTML=TABS.map(([k,lbl])=>{
     const n=k==='all'?LIST.length:(counts[k]||0);
-    return `<div class="tab ${TAB===k?'on':''}" onclick="setTab('${k}')">${lbl}<span class="cnt">${n}</span></div>`;
+    const em=k.startsWith('fue')?' email':'';
+    return `<div class="tab${em} ${TAB===k?'on':''}" onclick="setTab('${k}')">${lbl}<span class="cnt">${n}</span></div>`;
   }).join('');
   document.getElementById('convos').innerHTML=LIST.filter(c=>(TAB==='all'||tagOf(c)===TAB)&&(!q||(c.name+c.preview).toLowerCase().includes(q))).map(c=>`
     <div class="convo ${c.id===CUR?'active':''}" onclick="open_('${c.id}')">
