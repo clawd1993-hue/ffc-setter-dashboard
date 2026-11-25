@@ -314,6 +314,11 @@ async function delBookmark(id){
   await fetch('/api/bookmarks/'+id,{method:'DELETE'});
   renderBookmarks();
 }
+// click anywhere outside an open menu (or its trigger button) closes all three menus
+document.addEventListener('click',e=>{
+  if(e.target.closest('.flowmenu')||e.target.closest('.emojimenu')||e.target.closest('.auto-btn')||e.target.closest('.canned-btn')||e.target.closest('.emoji-btn'))return;
+  ['flowmenu','cannedmenu','emojimenu'].forEach(id=>{const m=document.getElementById(id);if(m)m.style.display='none';});
+});
 renderBookmarks();
 loadList(); setInterval(()=>{loadList(); if(CUR)open_(CUR,true);},5000);
 </script>
