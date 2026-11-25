@@ -105,10 +105,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // 1) ManyChat External Request lands here on every inbound message
 app.post('/manychat/inbound', async (req, res) => {
-  // ManyChat passes subscriber fields; map loosely for the skeleton
+  // ManyChat passes subscriber fields; accept many possible shapes/keys
   const b = req.body || {};
-  const sid = String(b.subscriber_id || b.id || 'unknown');
-  const text = b.last_input_text || b.text || '';
+  const pickv = (...ks) => { for (const k of ks) { if (b[k] != null && String(b[k]).trim() !== '') return String(b[k]).trim(); } return ''; };
+  try { fs.appendFileSync(path.join(__dirname, 'inbound.log'), new Date().toISOString() + ' ' + JSON.stringify(b) + '\n'); } catch {}
+  const sid = pickv('subscriber_id', 'id', 'user_id', 'contact_id', 'key') || 'unknown';
+  const text = pickv('text', 'last_input_text', 'last_text_input', 'last_text', 'message', 'last_input');
+  b.name = b.name || [pickv('first_name'), pickv('last_name')].filter(Boolean).join(' ') || pickv('full_name', 'username');
   let c = db.conversations.find(x => x.subscriber_id === sid);
   if (!c) {
     c = { id: 'mc-' + sid, subscriber_id: sid, name: b.name || 'Lead ' + sid.slice(-4), handle: b.user_name || '', channel: 'Telegram', avatarColor: '#0084FF', mode: 'approve', tag: 'review', updated: Date.now(), lead: {}, aiRead: [], nextStep: '', messages: [], suggestion: null };
