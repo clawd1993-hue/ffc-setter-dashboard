@@ -13,6 +13,11 @@
   .badge{background:var(--blue);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
   .search{padding:10px 16px;border-bottom:1px solid var(--line);}
   .search input{width:100%;padding:8px 12px;border:none;background:var(--bg);border-radius:18px;font-size:13px;outline:none;}
+  .tabs{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);overflow-x:auto;}
+  .tab{flex:0 0 auto;padding:5px 11px;border-radius:14px;font-size:12px;font-weight:600;color:var(--muted);background:var(--bg);cursor:pointer;white-space:nowrap;border:1px solid transparent;transition:.12s;}
+  .tab:hover{background:var(--blue-soft);}
+  .tab.on{background:var(--blue);color:#fff;}
+  .tab .cnt{opacity:.7;font-weight:700;margin-left:3px;}
   .convos{overflow-y:auto;flex:1;}
   .convo{display:flex;gap:10px;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--line);}
   .convo:hover{background:#fafbfc;}
@@ -107,6 +112,7 @@
   <div class="list">
     <div class="list-head">Inbox <span class="badge" id="count">—</span></div>
     <div class="search"><input autocomplete="off" placeholder="Search conversations..." oninput="filter(this.value)"></div>
+    <div class="tabs" id="tabs"></div>
     <div class="convos" id="convos"></div>
   </div>
 
@@ -147,7 +153,10 @@
   </div>
 
 <script>
-let LIST=[], CUR=null, FILTER='';
+let LIST=[], CUR=null, FILTER='', TAB='all';
+const TABS=[['all','All'],['review','Needs review'],['replied','Replied'],['auto','Auto'],['hot','Hot']];
+const tagOf=c=>['auto','hot','replied'].includes(c.tag)?c.tag:'review';
+function setTab(t){TAB=t;loadList();}
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const ago=t=>{const s=(Date.now()-t)/1000;if(s<60)return'now';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';return Math.floor(s/86400)+'d';};
 
@@ -156,7 +165,13 @@ async function loadList(){
   LIST.sort((a,b)=>b.updated-a.updated);
   document.getElementById('count').textContent=LIST.length;
   const q=FILTER.toLowerCase();
-  document.getElementById('convos').innerHTML=LIST.filter(c=>!q||(c.name+c.preview).toLowerCase().includes(q)).map(c=>`
+  // render filter tabs with live counts
+  const counts={}; LIST.forEach(c=>{const t=tagOf(c);counts[t]=(counts[t]||0)+1;});
+  document.getElementById('tabs').innerHTML=TABS.map(([k,lbl])=>{
+    const n=k==='all'?LIST.length:(counts[k]||0);
+    return `<div class="tab ${TAB===k?'on':''}" onclick="setTab('${k}')">${lbl}<span class="cnt">${n}</span></div>`;
+  }).join('');
+  document.getElementById('convos').innerHTML=LIST.filter(c=>(TAB==='all'||tagOf(c)===TAB)&&(!q||(c.name+c.preview).toLowerCase().includes(q))).map(c=>`
     <div class="convo ${c.id===CUR?'active':''}" onclick="open_('${c.id}')">
       <div class="avatar" style="background:${c.avatarColor}">${esc((c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2))}</div>
       <div class="meta">
