@@ -197,7 +197,7 @@ app.post('/api/send', async (req, res) => {
   const out = (text || (c.suggestion && c.suggestion.text) || '').trim(); if (!out) return res.status(400).json({ error: 'empty' });
   if (!SEND_ENABLED) { return res.json({ ok: false, blocked: true, note: 'Sending is OFF (SEND_ENABLED not set). Nothing was sent to the lead.' }); }
   const r = await sendText(c.subscriber_id, out);
-  c.messages.push({ dir: 'out', text: out, t: Date.now() }); c.suggestion = null; c.tag = 'auto'; touch(c);
+  c.messages.push({ dir: 'out', text: out, t: Date.now() }); c.suggestion = null; c.tag = 'replied'; touch(c);
   res.json({ ok: true, manychat: r });
 });
 
