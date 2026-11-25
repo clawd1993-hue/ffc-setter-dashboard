@@ -89,8 +89,6 @@
 
   <div class="thread" id="thread"><div class="empty">Select a conversation</div></div>
 
-  <div class="panel" id="panel"></div>
-
 <script>
 let LIST=[], CUR=null, FILTER='';
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -159,13 +157,6 @@ async function open_(id,keepDraft){
         <button class="btn send" onclick="send('${c.id}',document.getElementById('reply').value)">Send</button>
       </div>
     </div>`;
-  const lead=c.lead||{};
-  document.getElementById('panel').innerHTML=`
-    <div class="lead-name">${esc(c.name)}</div>
-    <div style="color:var(--muted);font-size:12px;margin-top:2px;">${esc(c.handle)}</div>
-    <h4>Lead status</h4>${Object.entries(lead).map(([k,v])=>`<div class="row"><span class="k">${esc(k)}</span><span>${esc(String(v))}</span></div>`).join('')||'<div style="color:var(--muted);font-size:12px">—</div>'}
-    <h4>AI read</h4>${(c.aiRead||[]).map(p=>`<span class="pill">${esc(p)}</span>`).join('')||'<div style="color:var(--muted);font-size:12px">—</div>'}
-    <h4>Next step</h4><div style="font-size:13px;line-height:1.4;">${esc(c.nextStep||'—')}</div>`;
   const m=document.getElementById('msgs'); if(m)m.scrollTop=m.scrollHeight;
   window.__msgCount=(c.messages||[]).length;
   // restore the draft the human was typing before the refresh
