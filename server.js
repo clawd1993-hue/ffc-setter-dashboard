@@ -203,9 +203,10 @@ app.post('/api/send', async (req, res) => {
 
 // 4) hand off to a SAVED ManyChat flow (booking/qualify/etc) — sendFlow
 app.post('/api/fire-flow', async (req, res) => {
-  const { id, flow_ns } = req.body; const c = convo(id); if (!c) return res.status(404).json({ error: 'not found' });
+  const { id, flow_ns, name } = req.body; const c = convo(id); if (!c) return res.status(404).json({ error: 'not found' });
+  if (!SEND_ENABLED) { return res.json({ ok: false, blocked: true, note: 'Sending is OFF (SEND_ENABLED not set). Automation NOT fired to the lead.' }); }
   const r = await sendFlow(c.subscriber_id, flow_ns);
-  c.messages.push({ dir: 'out', text: `⚙️ fired flow ${flow_ns}`, t: Date.now() }); touch(c);
+  c.messages.push({ dir: 'out', text: `⚙️ fired automation: ${name || flow_ns}`, t: Date.now() }); touch(c);
   res.json({ ok: true, manychat: r });
 });
 

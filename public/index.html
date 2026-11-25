@@ -41,7 +41,14 @@
   .in{align-self:flex-start;background:var(--bg);border-bottom-left-radius:4px;}
   .out{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px;}
   .stamp{align-self:center;color:var(--muted);font-size:11px;margin:4px 0;}
-  .compose{border-top:1px solid var(--line);padding:14px 20px;background:#fff;}
+  .compose{border-top:1px solid var(--line);padding:14px 20px;background:#fff;position:relative;}
+  .auto-btn{background:#fff;border:1px solid var(--line);color:var(--blue);font-size:17px;padding:8px 13px;line-height:1;}
+  .auto-btn:hover{background:var(--blue-soft);}
+  .flowmenu{display:none;position:absolute;bottom:62px;left:20px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);min-width:250px;max-height:300px;overflow-y:auto;z-index:30;padding:6px;}
+  .flowhead{font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;padding:8px 10px 6px;}
+  .flowitem{padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;}
+  .flowitem:hover{background:var(--blue-soft);}
+  .flowitem.muted{color:var(--muted);cursor:default;}
   .ai-suggest{background:var(--blue-soft);border:1px solid #CCE4FF;border-radius:12px;padding:12px 14px;margin-bottom:10px;}
   .ai-suggest .label{font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
   .ai-suggest .txt{font-size:14px;line-height:1.45;}
@@ -126,7 +133,9 @@ async function open_(id,keepDraft){
           <button class="btn ghost" onclick="document.getElementById('reply').value=document.getElementById('sugtxt').textContent;document.getElementById('reply').focus()">Edit</button>
           <button class="btn skip" onclick="setMode('${c.id}','approve')">Skip / take over</button>
         </div></div>`:''}
+      <div id="flowmenu" class="flowmenu"></div>
       <div class="inputrow">
+        <button class="btn auto-btn" title="Fire an automation" onclick="openFlows('${c.id}')">⚡</button>
         <input id="reply" autocomplete="off" placeholder="Type your own reply..." onkeydown="if(event.key==='Enter')send('${c.id}',this.value)">
         <button class="btn send" onclick="send('${c.id}',document.getElementById('reply').value)">Send</button>
       </div>
@@ -144,6 +153,24 @@ async function open_(id,keepDraft){
   const r=document.getElementById('reply');
   if(r&&draft){r.value=draft; if(hadFocus){r.focus(); try{r.setSelectionRange(caret,caret);}catch(e){}}}
   loadList();
+}
+let FLOWS=null;
+async function openFlows(id){
+  const menu=document.getElementById('flowmenu'); if(!menu)return;
+  if(menu.style.display==='block'){ menu.style.display='none'; return; }
+  if(!FLOWS){ try{ const r=await (await fetch('/api/flows')).json(); FLOWS=(r.data&&r.data.flows)||[]; }catch(e){ FLOWS=[]; } }
+  menu.innerHTML='<div class="flowhead">⚡ Fire an automation</div>'+
+    (FLOWS.length?FLOWS.map((f,i)=>`<div class="flowitem" onclick="fireFlow('${id}',${i})">${esc(f.name)}</div>`).join('')
+                 :'<div class="flowitem muted">No automations found</div>');
+  menu.style.display='block';
+}
+async function fireFlow(id,i){
+  const f=FLOWS&&FLOWS[i]; if(!f)return;
+  if(!confirm('Fire "'+f.name+'" to this lead?\nThis sends the automation to them.'))return;
+  const menu=document.getElementById('flowmenu'); if(menu)menu.style.display='none';
+  const r=await (await fetch('/api/fire-flow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,flow_ns:f.ns,name:f.name})})).json();
+  if(r&&r.blocked){ alert('Sending is OFF — automation NOT fired.'); return; }
+  open_(id);
 }
 async function send(id,text){ if(!text||!text.trim())return;
   await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,text:text.trim()})});
