@@ -28,6 +28,8 @@
   .reopen-lead{background:#fff;border:1px solid var(--line);color:var(--muted);margin-left:12px;padding:6px 12px;}
   .reopen-lead:hover{background:var(--bg);color:var(--text);}
   .modal-sub{padding:0 22px;font-size:13px;color:var(--muted);line-height:1.5;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,20px);background:#1C1E21;color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:120;opacity:0;transition:.25s;pointer-events:none;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
   .convos{overflow-y:auto;flex:1;}
   .convo{display:flex;gap:10px;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--line);}
   .convo:hover{background:#fafbfc;}
@@ -175,6 +177,17 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="flowModal">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">⚡ Fire automation?</div>
+      <div class="modal-sub">Send <b id="flow-name">this automation</b> to this lead now? This triggers the ManyChat flow and messages them directly.</div>
+      <div class="modal-foot">
+        <button class="btn ghost" onclick="closeFlowModal()">Cancel</button>
+        <button class="btn send" onclick="confirmFireFlow()">Fire it</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 let LIST=[], CUR=null, FILTER='', TAB='all';
 const TABS=[['all','All'],['review','Needs review'],['replied','Replied'],
@@ -293,13 +306,24 @@ async function openFlows(id){
                  :'<div class="flowitem muted">No automations found</div>');
   menu.style.display='block';
 }
-async function fireFlow(id,i){
+let FIRE=null; // {id, flow}
+function fireFlow(id,i){
   const f=FLOWS&&FLOWS[i]; if(!f)return;
-  if(!confirm('Fire "'+f.name+'" to this lead?\nThis sends the automation to them.'))return;
+  FIRE={id,flow:f};
   const menu=document.getElementById('flowmenu'); if(menu)menu.style.display='none';
-  const r=await (await fetch('/api/fire-flow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,flow_ns:f.ns,name:f.name})})).json();
-  if(r&&r.blocked){ alert('Sending is OFF — automation NOT fired.'); return; }
+  document.getElementById('flow-name').textContent='"'+f.name+'"';
+  document.getElementById('flowModal').classList.add('show');
+}
+function closeFlowModal(){document.getElementById('flowModal').classList.remove('show');FIRE=null;}
+async function confirmFireFlow(){
+  if(!FIRE)return; const {id,flow}=FIRE; closeFlowModal();
+  const r=await (await fetch('/api/fire-flow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,flow_ns:flow.ns,name:flow.name})})).json();
+  if(r&&r.blocked){ toast('Sending is OFF — automation NOT fired.'); return; }
   open_(id);
+}
+function toast(msg){
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'),10); setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},3200);
 }
 let CANNED=null;
 async function loadCanned(force){ if(CANNED&&!force)return CANNED; try{ CANNED=await (await fetch('/api/canned')).json(); }catch(e){ CANNED=[]; } return CANNED; }
@@ -357,11 +381,12 @@ async function reopenLead(id){
   open_(id);
 }
 document.getElementById('closeModal').addEventListener('click',e=>{if(e.target.id==='closeModal')closeCloseModal();});
+document.getElementById('flowModal').addEventListener('click',e=>{if(e.target.id==='flowModal')closeFlowModal();});
 
 // close modal on overlay click or Escape
 document.getElementById('savedModal').addEventListener('click',e=>{if(e.target.id==='savedModal')closeSavedModal();});
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeSavedModal();closeBmModal();closeCloseModal();}
+  if(e.key==='Escape'){closeSavedModal();closeBmModal();closeCloseModal();closeFlowModal();}
   if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)&&document.getElementById('savedModal').classList.contains('show'))submitSavedModal();
   if(e.key==='Enter'&&document.getElementById('bmModal').classList.contains('show')){e.preventDefault();submitBmModal();}
 });
