@@ -29,13 +29,57 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';  // reuse ours
 const MC_BASE = 'https://api.manychat.com';
 const STORE = path.join(__dirname, 'conversations.json');
 
-// ---------- tiny JSON store (cut SQLite for skeleton) ----------
-function load() {
-  try { return JSON.parse(fs.readFileSync(STORE, 'utf8')); }
-  catch { return { conversations: seed() }; }
+// ---------- Supabase (persistent store, survives deploys) ----------
+// Uses PostgREST directly with the service-role key — no npm dependency.
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SB_TABLE = 'ffc_setter_conversations';
+const USE_DB = !!(SUPABASE_URL && SUPABASE_KEY);
+
+async function sb(pathq, opts = {}) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${pathq}`, {
+    ...opts,
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+  });
+  if (!r.ok) throw new Error(`supabase ${r.status}: ${await r.text().catch(() => '')}`);
+  return r.status === 204 ? null : r.json().catch(() => null);
 }
-function save(db) { fs.writeFileSync(STORE, JSON.stringify(db, null, 2)); }
-let db = load();
+
+// upsert one conversation row (fire-and-forget on writes, awaited where it matters)
+async function dbUpsert(c) {
+  if (!USE_DB) return;
+  const row = { id: c.id, subscriber_id: c.subscriber_id, name: c.name || '', updated: c.updated || Date.now(), data: c };
+  await sb(`${SB_TABLE}?on_conflict=id`, {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(row),
+  });
+}
+
+// ---------- store (Supabase when configured, JSON file fallback for local) ----------
+function loadFile() {
+  try { return JSON.parse(fs.readFileSync(STORE, 'utf8')); }
+  catch { return { conversations: USE_DB ? [] : seed() }; }
+}
+function save(db) { if (!USE_DB) fs.writeFileSync(STORE, JSON.stringify(db, null, 2)); }
+let db = loadFile();
+
+async function bootLoad() {
+  if (!USE_DB) return;
+  try {
+    const rows = await sb(`${SB_TABLE}?select=data&order=updated.desc`);
+    db.conversations = (rows || []).map(r => r.data).filter(Boolean);
+    console.log(`[db] loaded ${db.conversations.length} conversations from Supabase`);
+  } catch (e) {
+    console.error('[db] load failed, starting empty:', e.message);
+    db.conversations = [];
+  }
+}
 
 function seed() {
   // one demo convo so the dashboard renders live on first boot
@@ -63,7 +107,11 @@ function seed() {
 }
 
 function convo(id) { return db.conversations.find(c => c.id === id); }
-function touch(c) { c.updated = Date.now(); save(db); }
+function touch(c) {
+  c.updated = Date.now();
+  save(db); // JSON fallback (no-op when USE_DB)
+  if (USE_DB) dbUpsert(c).catch(e => console.error('[db] upsert failed:', e.message));
+}
 
 // ---------- ManyChat API helpers ----------
 async function mc(endpoint, body) {
@@ -175,6 +223,8 @@ app.get('/api/flows', async (_req, res) => {
   res.json(await r.json().catch(() => ({ ok: r.ok })));
 });
 
-app.get('/health', (_req, res) => res.json({ ok: true, manychat: !!MANYCHAT_TOKEN, brain: !!ANTHROPIC_API_KEY, convos: db.conversations.length }));
+app.get('/health', (_req, res) => res.json({ ok: true, manychat: !!MANYCHAT_TOKEN, brain: !!ANTHROPIC_API_KEY, db: USE_DB, convos: db.conversations.length }));
 
-app.listen(PORT, () => console.log(`FFC Setter skeleton on http://localhost:${PORT}  (manychat:${!!MANYCHAT_TOKEN} brain:${!!ANTHROPIC_API_KEY})`));
+bootLoad().finally(() => {
+  app.listen(PORT, () => console.log(`FFC Setter on http://localhost:${PORT}  (manychat:${!!MANYCHAT_TOKEN} brain:${!!ANTHROPIC_API_KEY} db:${USE_DB})`));
+});
