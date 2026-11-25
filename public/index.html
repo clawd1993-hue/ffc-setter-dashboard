@@ -63,7 +63,7 @@
 <body>
   <div class="list">
     <div class="list-head">Inbox <span class="badge" id="count">—</span></div>
-    <div class="search"><input placeholder="Search conversations..." oninput="filter(this.value)"></div>
+    <div class="search"><input autocomplete="off" placeholder="Search conversations..." oninput="filter(this.value)"></div>
     <div class="convos" id="convos"></div>
   </div>
 
@@ -93,9 +93,16 @@ async function loadList(){
 }
 function filter(v){FILTER=v;loadList();}
 
-async function open_(id){
+async function open_(id,keepDraft){
   CUR=id;
+  // preserve whatever the human is typing across the 5s auto-refresh
+  const prevEl=document.getElementById('reply');
+  const draft=keepDraft&&prevEl?prevEl.value:'';
+  const hadFocus=keepDraft&&prevEl&&document.activeElement===prevEl;
+  const caret=prevEl?prevEl.selectionStart:0;
   const c=await (await fetch('/api/conversation/'+id)).json();
+  // if the user is mid-type and nothing new arrived, don't rebuild the pane at all
+  if(keepDraft&&hadFocus&&window.__msgCount===(c.messages||[]).length){loadList();return;}
   const sug=c.suggestion;
   document.getElementById('thread').innerHTML=`
     <div class="thread-head">
@@ -119,7 +126,7 @@ async function open_(id){
           <button class="btn skip" onclick="setMode('${c.id}','approve')">Skip / take over</button>
         </div></div>`:''}
       <div class="inputrow">
-        <input id="reply" placeholder="Type your own reply..." onkeydown="if(event.key==='Enter')send('${c.id}',this.value)">
+        <input id="reply" autocomplete="off" placeholder="Type your own reply..." onkeydown="if(event.key==='Enter')send('${c.id}',this.value)">
         <button class="btn send" onclick="send('${c.id}',document.getElementById('reply').value)">Send</button>
       </div>
     </div>`;
@@ -131,6 +138,10 @@ async function open_(id){
     <h4>AI read</h4>${(c.aiRead||[]).map(p=>`<span class="pill">${esc(p)}</span>`).join('')||'<div style="color:var(--muted);font-size:12px">—</div>'}
     <h4>Next step</h4><div style="font-size:13px;line-height:1.4;">${esc(c.nextStep||'—')}</div>`;
   const m=document.getElementById('msgs'); if(m)m.scrollTop=m.scrollHeight;
+  window.__msgCount=(c.messages||[]).length;
+  // restore the draft the human was typing before the refresh
+  const r=document.getElementById('reply');
+  if(r&&draft){r.value=draft; if(hadFocus){r.focus(); try{r.setSelectionRange(caret,caret);}catch(e){}}}
   loadList();
 }
 async function send(id,text){ if(!text||!text.trim())return;
@@ -141,7 +152,7 @@ async function setMode(id,mode){
   await fetch('/api/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,mode})});
   open_(id);
 }
-loadList(); setInterval(()=>{loadList(); if(CUR)open_(CUR);},5000);
+loadList(); setInterval(()=>{loadList(); if(CUR)open_(CUR,true);},5000);
 </script>
 </body>
 </html>
