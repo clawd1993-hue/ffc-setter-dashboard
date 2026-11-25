@@ -313,12 +313,22 @@ async function setMode(id,mode){
 }
 // ---- bookmarks panel (setter quick links) ----
 function favHost(u){try{return new URL(u).hostname;}catch(e){return (u||'').replace(/^https?:\/\//,'').split('/')[0];}}
+// real product icons (Google's favicon service returns a generic "G" for docs.google.com)
+function favIcon(u){
+  const url=(u||'').toLowerCase();
+  if(url.includes('docs.google.com/spreadsheets')||url.includes('sheets.google.com'))return 'https://www.gstatic.com/images/branding/product/2x/sheets_2020q4_48dp.png';
+  if(url.includes('docs.google.com/document'))return 'https://www.gstatic.com/images/branding/product/2x/docs_2020q4_48dp.png';
+  if(url.includes('docs.google.com/presentation'))return 'https://www.gstatic.com/images/branding/product/2x/slides_2020q4_48dp.png';
+  if(url.includes('drive.google.com'))return 'https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png';
+  if(url.includes('calendar.google.com'))return 'https://www.gstatic.com/images/branding/product/2x/calendar_2020q4_48dp.png';
+  return 'https://www.google.com/s2/favicons?sz=64&domain='+encodeURIComponent(favHost(u));
+}
 async function renderBookmarks(){
   const p=document.getElementById('panel'); if(!p)return;
   let bm=[]; try{ bm=await (await fetch('/api/bookmarks')).json(); }catch(e){}
   p.innerHTML='<h4 style="margin-top:0">🔖 Bookmarks</h4>'+
     (bm.length?bm.map(b=>`<a class="bm" href="${esc(b.url)}" target="_blank" rel="noopener">
-        <img class="ico" src="https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(favHost(b.url))}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ico',textContent:'🔗'}))"><span class="lbl">${esc(b.label)}</span>
+        <img class="ico" src="${favIcon(b.url)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ico',textContent:'🔗'}))"><span class="lbl">${esc(b.label)}</span>
         <span class="del" title="Remove" onclick="event.preventDefault();event.stopPropagation();delBookmark(${b.id})">✕</span>
       </a>`).join(''):'<div style="color:var(--muted);font-size:12px;margin-bottom:8px">No bookmarks yet</div>')+
     '<button class="bm-add" onclick="addBookmark()">+ Add bookmark</button>';
