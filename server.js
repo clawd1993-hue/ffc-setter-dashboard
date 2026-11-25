@@ -128,6 +128,21 @@ const sendText = (subscriber_id, text) =>
   mc('/fb/sending/sendContent', { subscriber_id, data: { version: 'v2', content: { type: 'telegram', messages: [{ type: 'text', text }] } } });
 // fire a SAVED ManyChat automation (booking/qualify/tag sequence) — THE hand-off
 const sendFlow = (subscriber_id, flow_ns) => mc('/fb/sending/sendFlow', { subscriber_id, flow_ns });
+// GET helper (getInfo etc.)
+async function mcGet(endpoint) {
+  if (!MANYCHAT_TOKEN) return null;
+  const r = await fetch(MC_BASE + endpoint, { headers: { Authorization: `Bearer ${MANYCHAT_TOKEN}` } });
+  return r.json().catch(() => null);
+}
+// pull the lead's saved email (ManyChat system field) once, cache it on the convo
+async function enrichEmail(c) {
+  if (!c || c.email || !MANYCHAT_TOKEN || !c.subscriber_id) return;
+  try {
+    const r = await mcGet(`/fb/subscriber/getInfo?subscriber_id=${encodeURIComponent(c.subscriber_id)}`);
+    const d = r && r.data;
+    if (d) { if (d.email) c.email = d.email; if (!c.handle && d.user_name) c.handle = '@' + d.user_name; touch(c); }
+  } catch (e) {}
+}
 
 // ---------- brain (suggestion) — real Claude if key, else stub ----------
 async function suggest(c) {
@@ -170,6 +185,7 @@ app.post('/manychat/inbound', async (req, res) => {
     db.conversations.unshift(c);
   }
   if (text) c.messages.push({ dir: 'in', text, t: Date.now() });
+  enrichEmail(c).catch(() => {}); // fire-and-forget: grab saved email on first contact
   const s = await suggest(c);
   c.suggestion = s; c.tag = c.mode === 'auto' ? 'auto' : 'review'; touch(c);
 
@@ -186,8 +202,9 @@ app.post('/manychat/inbound', async (req, res) => {
 app.get('/api/conversations', (_req, res) =>
   res.json(db.conversations.map(c => ({ id: c.id, name: c.name, handle: c.handle, channel: c.channel, avatarColor: c.avatarColor, mode: c.mode, tag: c.tag, updated: c.updated, preview: (c.messages.at(-1) || {}).text || '' }))));
 
-app.get('/api/conversation/:id', (req, res) => {
+app.get('/api/conversation/:id', async (req, res) => {
   const c = convo(req.params.id); if (!c) return res.status(404).json({ error: 'not found' });
+  if (!c.email) await enrichEmail(c); // backfill email on open
   res.json(c);
 });
 

@@ -121,7 +121,7 @@ async function open_(id,keepDraft){
   document.getElementById('thread').innerHTML=`
     <div class="thread-head">
       <div class="avatar" style="background:${c.avatarColor};width:38px;height:38px;flex:0 0 38px;font-size:14px;">${esc((c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2))}</div>
-      <div><div class="name">${esc(c.name)}</div><div class="sub">${esc(c.handle)} · ${esc(c.channel)}</div></div>
+      <div><div class="name">${esc(c.name)}</div><div class="sub">${c.email?'✉️ '+esc(c.email):esc(c.channel)}</div></div>
       <div class="mode-toggle">Mode:
         <div class="switch">
           <div class="${c.mode==='approve'?'on':''}" onclick="setMode('${c.id}','approve')">Approve</div>
