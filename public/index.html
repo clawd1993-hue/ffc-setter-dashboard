@@ -59,6 +59,8 @@
   .bubble{max-width:62%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-break:break-word;}
   .in{align-self:flex-start;background:var(--bg);border-bottom-left-radius:4px;}
   .out{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px;}
+  .bubble.mirror.out{background:#E7F0FF;color:#1C1E21;border:1px dashed #9EC2FF;}
+  .bubble.mirror.in{border:1px dashed var(--line);}
   .stamp{align-self:center;color:var(--muted);font-size:11px;margin:4px 0;}
   .compose{border-top:1px solid var(--line);padding:14px 20px;background:#fff;position:relative;}
   .auto-btn{background:#fff;border:1px solid var(--line);color:var(--blue);font-size:17px;padding:8px 13px;line-height:1;}
@@ -255,7 +257,7 @@ async function open_(id,keepDraft){
         </div>
       </div>
     </div>
-    <div class="msgs" id="msgs">${c.messages.map(m=>`<div class="bubble ${m.dir==='in'?'in':'out'}">${esc(m.text)}</div>`).join('')}</div>
+    <div class="msgs" id="msgs">${c.messages.map(m=>`<div class="bubble ${m.dir==='in'?'in':'out'}${m.mirror?' mirror':''}">${esc(m.text)}</div>`).join('')}</div>
     <div class="compose">
       ${sug?`<div class="ai-suggest">
         <div class="label">🤖 AI suggested reply · confidence ${Math.round((sug.confidence||0)*100)}%</div>

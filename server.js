@@ -228,6 +228,35 @@ app.post('/manychat/inbound', async (req, res) => {
   return res.json({ version: 'v2', content: { type: 'telegram', messages: [] } });
 });
 
+// 1b) MIRROR — ManyChat automations (e.g. the /start welcome flow) POST each of their
+// steps here so the setter sees the full exchange the automation ran (email ask, access
+// delivery, the lead's email reply). Does NOT generate an AI suggestion or send anything.
+// Body: { subscriber_id, text, dir?: 'out'|'in' (default out), label? }
+app.post('/manychat/mirror', (req, res) => {
+  const b = req.body || {};
+  const pickv = (...ks) => { for (const k of ks) { if (b[k] != null && String(b[k]).trim() !== '') return String(b[k]).trim(); } return ''; };
+  try { fs.appendFileSync(path.join(__dirname, 'inbound.log'), new Date().toISOString() + ' MIRROR ' + JSON.stringify(b) + '\n'); } catch {}
+  const sid = pickv('subscriber_id', 'id', 'user_id', 'contact_id', 'key');
+  let text = pickv('text', 'message', 'last_input_text', 'last_text_input', 'last_text', 'last_input');
+  const label = pickv('label');
+  if (label) text = `⚙️ ${label}${text ? ': ' + text : ''}`;
+  if (!sid || !text) return res.json({ ok: false, note: 'need subscriber_id + text' });
+  const dir = pickv('dir', 'direction').toLowerCase().startsWith('in') ? 'in' : 'out';
+  let c = db.conversations.find(x => x.subscriber_id === sid);
+  if (!c) {
+    b.name = b.name || [pickv('first_name'), pickv('last_name')].filter(Boolean).join(' ') || pickv('full_name', 'username');
+    c = { id: 'mc-' + sid, subscriber_id: sid, name: b.name || 'Lead ' + sid.slice(-4), handle: pickv('user_name'), channel: 'Telegram', avatarColor: '#0084FF', mode: 'approve', tag: 'review', updated: Date.now(), lead: {}, aiRead: [], nextStep: '', messages: [], suggestion: null };
+    db.conversations.unshift(c);
+  }
+  // dedupe: ignore identical dir+text within 15s (ManyChat can retry External Requests)
+  const last = c.messages.at(-1);
+  if (last && last.dir === dir && last.text === text && Date.now() - last.t < 15000) return res.json({ ok: true, deduped: true });
+  c.messages.push({ dir, text, t: Date.now(), mirror: true });
+  if (dir === 'in' && pickv('email')) c.email = c.email || pickv('email');
+  touch(c);
+  res.json({ ok: true });
+});
+
 // 2) dashboard feeds
 // status is DERIVED from the last message: they messaged last -> "review" (needs reply);
 // we messaged last -> "replied". Explicit follow-up stages (fu1..fue3) are a separate pipeline and win.
