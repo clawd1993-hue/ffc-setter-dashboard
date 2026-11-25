@@ -129,6 +129,22 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="bmModal">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">🔖 New bookmark</div>
+      <div class="modal-body">
+        <label for="bm-label">Name</label>
+        <input id="bm-label" type="text" placeholder="e.g. Booking Link" autocomplete="off">
+        <label for="bm-url">Link URL</label>
+        <input id="bm-url" type="text" placeholder="https://..." autocomplete="off">
+      </div>
+      <div class="modal-foot">
+        <button class="btn ghost" onclick="closeBmModal()">Cancel</button>
+        <button class="btn send" onclick="submitBmModal()">Save</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 let LIST=[], CUR=null, FILTER='';
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -276,8 +292,9 @@ async function submitSavedModal(){
 // close modal on overlay click or Escape
 document.getElementById('savedModal').addEventListener('click',e=>{if(e.target.id==='savedModal')closeSavedModal();});
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape')closeSavedModal();
+  if(e.key==='Escape'){closeSavedModal();closeBmModal();}
   if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)&&document.getElementById('savedModal').classList.contains('show'))submitSavedModal();
+  if(e.key==='Enter'&&document.getElementById('bmModal').classList.contains('show')){e.preventDefault();submitBmModal();}
 });
 async function delCanned(id){
   if(!confirm('Delete this saved message?'))return;
@@ -304,12 +321,22 @@ async function renderBookmarks(){
       </a>`).join(''):'<div style="color:var(--muted);font-size:12px;margin-bottom:8px">No bookmarks yet</div>')+
     '<button class="bm-add" onclick="addBookmark()">+ Add bookmark</button>';
 }
-async function addBookmark(){
-  const label=prompt('Bookmark name (e.g. Booking Link):'); if(!label||!label.trim())return;
-  const url=prompt('Link URL:'); if(!url||!url.trim())return;
-  await fetch('/api/bookmarks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({label:label.trim(),url:url.trim()})});
-  renderBookmarks();
+function addBookmark(){
+  document.getElementById('bm-label').value='';
+  document.getElementById('bm-url').value='';
+  document.getElementById('bmModal').classList.add('show');
+  setTimeout(()=>document.getElementById('bm-label').focus(),30);
 }
+function closeBmModal(){document.getElementById('bmModal').classList.remove('show');}
+async function submitBmModal(){
+  const label=document.getElementById('bm-label').value;
+  const url=document.getElementById('bm-url').value;
+  if(!label||!label.trim()){document.getElementById('bm-label').focus();return;}
+  if(!url||!url.trim()){document.getElementById('bm-url').focus();return;}
+  await fetch('/api/bookmarks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({label:label.trim(),url:url.trim()})});
+  closeBmModal(); renderBookmarks();
+}
+document.getElementById('bmModal').addEventListener('click',e=>{if(e.target.id==='bmModal')closeBmModal();});
 async function delBookmark(id){
   if(!confirm('Remove this bookmark?'))return;
   await fetch('/api/bookmarks/'+id,{method:'DELETE'});
