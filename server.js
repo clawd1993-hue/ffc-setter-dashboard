@@ -151,7 +151,7 @@ async function enrichEmail(c) {
 const tc = s => (s || '').trim().replace(/\b\w/g, m => m.toUpperCase());
 // look up the lead's REAL name from their checkout record in GHL (matched by email) — cache on convo
 async function enrichRealName(c) {
-  if (!c || !GHL_API_KEY || c.realNameChecked) return;
+  if (!c || !GHL_API_KEY || c.realNameV2) return;
   if (!c.email) return; // need an email to match on
   try {
     const url = `${GHL_BASE}/contacts/?locationId=${GHL_LOCATION_ID}&query=${encodeURIComponent(c.email)}&limit=5`;
@@ -159,15 +159,19 @@ async function enrichRealName(c) {
     const d = await r.json().catch(() => null);
     const email = (c.email || '').toLowerCase();
     const hit = (d && d.contacts || []).find(x => (x.email || '').toLowerCase() === email) || (d && d.contacts || [])[0];
-    c.realNameChecked = true;
+    c.realNameV2 = true;
     if (hit) {
-      const first = tc(hit.firstName || '');
-      const full = tc([hit.firstName, hit.lastName].filter(Boolean).join(' ') || hit.contactName || '');
+      // GHL sometimes stuffs the full name in firstName and repeats the surname → dedupe tokens, keep order
+      const raw = `${hit.firstName || ''} ${hit.lastName || ''}`.trim() || hit.contactName || '';
+      const seen = new Set(), uniq = [];
+      for (const p of raw.split(/\s+/).filter(Boolean)) { const k = p.toLowerCase(); if (!seen.has(k)) { seen.add(k); uniq.push(p); } }
+      const full = tc(uniq.join(' '));
+      const first = tc((hit.firstName || uniq[0] || '').trim().split(/\s+/)[0]); // single first name for messaging
       if (first) c.firstName = first;
       if (full) c.realName = full;
     }
     touch(c);
-  } catch (e) { c.realNameChecked = true; }
+  } catch (e) { c.realNameV2 = true; }
 }
 
 // ---------- brain (suggestion) — real Claude if key, else stub ----------
@@ -231,7 +235,7 @@ app.get('/api/conversations', (_req, res) =>
 app.get('/api/conversation/:id', async (req, res) => {
   const c = convo(req.params.id); if (!c) return res.status(404).json({ error: 'not found' });
   if (!c.email) await enrichEmail(c); // backfill email on open
-  if (!c.realNameChecked) await enrichRealName(c); // backfill real checkout name from GHL
+  if (!c.realNameV2) await enrichRealName(c); // backfill real checkout name from GHL
   res.json(c);
 });
 
