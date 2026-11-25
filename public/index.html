@@ -109,8 +109,9 @@ async function open_(id,keepDraft){
   const hadFocus=keepDraft&&prevEl&&document.activeElement===prevEl;
   const caret=prevEl?prevEl.selectionStart:0;
   const c=await (await fetch('/api/conversation/'+id)).json();
-  // if the user is mid-type and nothing new arrived, don't rebuild the pane at all
-  if(keepDraft&&hadFocus&&window.__msgCount===(c.messages||[]).length){loadList();return;}
+  // auto-refresh: if no NEW message arrived, don't rebuild the pane at all
+  // (prevents scroll jumps, closing the flow menu, and wiping a draft)
+  if(keepDraft&&CUR===id&&window.__msgCount===(c.messages||[]).length){loadList();return;}
   const sug=c.suggestion;
   document.getElementById('thread').innerHTML=`
     <div class="thread-head">
