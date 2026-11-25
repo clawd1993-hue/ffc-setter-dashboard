@@ -1,0 +1,16 @@
+{
+  "name": "ffc-setter-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FFC AI setter — ManyChat-lookalike inbox skeleton. ManyChat (Telegram pipe) -> our brain -> Approve/Auto. Fires saved ManyChat flows via sendFlow.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "^0.30.1"
+  }
+}

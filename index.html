@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FFC Setter — Inbox</title>
+<style>
+  :root{
+    --blue:#0084FF; --blue-soft:#E7F3FF; --bg:#F5F6F8; --line:#E4E6EB;
+    --text:#1C1E21; --muted:#65676B; --green:#31A24C; --amber:#F5A623;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  body{height:100vh;display:flex;background:var(--bg);color:var(--text);font-size:14px;}
+
+  /* ---- LEFT: conversation list ---- */
+  .list{width:320px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;}
+  .list-head{padding:16px;border-bottom:1px solid var(--line);font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:space-between;}
+  .badge{background:var(--blue);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
+  .search{padding:10px 16px;border-bottom:1px solid var(--line);}
+  .search input{width:100%;padding:8px 12px;border:none;background:var(--bg);border-radius:18px;font-size:13px;outline:none;}
+  .convo{display:flex;gap:10px;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--line);}
+  .convo:hover{background:#fafbfc;}
+  .convo.active{background:var(--blue-soft);}
+  .avatar{width:42px;height:42px;border-radius:50%;flex:0 0 42px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:15px;}
+  .meta{flex:1;min-width:0;}
+  .meta .top{display:flex;justify-content:space-between;align-items:center;}
+  .meta .name{font-weight:600;}
+  .meta .time{color:var(--muted);font-size:11px;}
+  .meta .preview{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--blue);flex:0 0 8px;align-self:center;}
+  .tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;margin-top:4px;font-weight:600;}
+  .tag.auto{background:#E6F4EA;color:var(--green);}
+  .tag.hot{background:#FDECEA;color:#D93025;}
+  .tag.review{background:#FEF3D9;color:#B8860B;}
+
+  /* ---- CENTER: thread ---- */
+  .thread{flex:1;display:flex;flex-direction:column;background:#fff;}
+  .thread-head{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;}
+  .thread-head .name{font-weight:700;font-size:16px;}
+  .thread-head .sub{color:var(--muted);font-size:12px;}
+  .mode-toggle{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+  .switch{position:relative;width:74px;height:28px;background:var(--bg);border:1px solid var(--line);border-radius:16px;cursor:pointer;font-size:11px;font-weight:600;}
+  .switch span{position:absolute;top:4px;height:20px;line-height:20px;border-radius:12px;transition:.2s;text-align:center;}
+  .switch .knob{width:38px;background:var(--blue);color:#fff;left:3px;}
+  .switch .lbl{color:var(--muted);right:8px;top:5px;}
+
+  .msgs{flex:1;overflow-y:auto;padding:24px 20px;display:flex;flex-direction:column;gap:10px;background:#fff;}
+  .bubble{max-width:62%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.4;}
+  .in{align-self:flex-start;background:var(--bg);border-bottom-left-radius:4px;}
+  .out{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px;}
+  .voice{align-self:flex-end;background:var(--blue);color:#fff;display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:18px;border-bottom-right-radius:4px;}
+  .voice .play{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;}
+  .wave{font-size:11px;letter-spacing:1px;opacity:.85;}
+  .stamp{align-self:center;color:var(--muted);font-size:11px;margin:4px 0;}
+
+  /* ---- AI suggestion / compose bar ---- */
+  .compose{border-top:1px solid var(--line);padding:14px 20px;background:#fff;}
+  .ai-suggest{background:var(--blue-soft);border:1px solid #CCE4FF;border-radius:12px;padding:12px 14px;margin-bottom:10px;}
+  .ai-suggest .label{font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+  .ai-suggest .txt{font-size:14px;line-height:1.45;}
+  .ai-actions{display:flex;gap:8px;margin-top:10px;}
+  .btn{border:none;border-radius:18px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;}
+  .btn.send{background:var(--blue);color:#fff;}
+  .btn.edit{background:#fff;border:1px solid var(--line);color:var(--text);}
+  .btn.voice{background:#fff;border:1px solid var(--line);color:var(--text);}
+  .btn.skip{background:#fff;border:1px solid var(--line);color:var(--muted);margin-left:auto;}
+  .inputrow{display:flex;gap:10px;align-items:center;}
+  .inputrow input{flex:1;padding:10px 14px;border:1px solid var(--line);border-radius:20px;outline:none;font-size:14px;}
+
+  /* ---- RIGHT: lead panel ---- */
+  .panel{width:260px;background:#fff;border-left:1px solid var(--line);padding:20px;}
+  .panel h4{font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin:18px 0 8px;}
+  .panel .lead-name{font-weight:700;font-size:16px;}
+  .panel .row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line);}
+  .panel .row .k{color:var(--muted);}
+  .pill{display:inline-block;font-size:11px;padding:3px 9px;border-radius:10px;background:var(--blue-soft);color:var(--blue);font-weight:600;margin:2px 4px 2px 0;}
+</style>
+</head>
+<body>
+
+  <!-- LEFT: conversations -->
+  <div class="list">
+    <div class="list-head">Inbox <span class="badge">3 new</span></div>
+    <div class="search"><input placeholder="Search conversations..."></div>
+
+    <div class="convo active">
+      <div class="avatar" style="background:#F5A623;">SJ</div>
+      <div class="meta">
+        <div class="top"><span class="name">Sarah J.</span><span class="time">now</span></div>
+        <div class="preview">how much is the elite thing again?</div>
+        <span class="tag review">● Needs review</span>
+      </div>
+      <div class="dot"></div>
+    </div>
+
+    <div class="convo">
+      <div class="avatar" style="background:#31A24C;">MK</div>
+      <div class="meta">
+        <div class="top"><span class="name">Mike K.</span><span class="time">2m</span></div>
+        <div class="preview">ok cool send me the link 🙌</div>
+        <span class="tag auto">● Auto</span>
+      </div>
+    </div>
+
+    <div class="convo">
+      <div class="avatar" style="background:#D93025;">RP</div>
+      <div class="meta">
+        <div class="top"><span class="name">Rosa P.</span><span class="time">8m</span></div>
+        <div class="preview">i need to talk to a real person about pricing</div>
+        <span class="tag hot">● Hot — take over</span>
+      </div>
+      <div class="dot"></div>
+    </div>
+
+    <div class="convo">
+      <div class="avatar" style="background:#0084FF;">DT</div>
+      <div class="meta">
+        <div class="top"><span class="name">Dan T.</span><span class="time">21m</span></div>
+        <div class="preview">You: just sent you the booking link 👇</div>
+        <span class="tag auto">● Auto</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: thread -->
+  <div class="thread">
+    <div class="thread-head">
+      <div class="avatar" style="background:#F5A623;width:38px;height:38px;flex:0 0 38px;font-size:14px;">SJ</div>
+      <div>
+        <div class="name">Sarah J.</div>
+        <div class="sub">@sarahj_fit · Instagram DM</div>
+      </div>
+      <div class="mode-toggle">
+        Mode:
+        <div class="switch" title="Toggle Approve / Auto for this conversation">
+          <span class="knob">Approve</span><span class="lbl">Auto</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="msgs">
+      <div class="stamp">Today 9:42 PM</div>
+      <div class="bubble in">hey saw your ad, what is this exactly?</div>
+      <div class="bubble out">Hey Sarah! 🙌 It's the Faceless Funnel Challenge — a 10-day program that shows you how to make money selling done-for-you digital products online. Totally beginner-friendly. What's pulling you toward it?</div>
+      <div class="bubble in">i've never done anything online before tho</div>
+      <div class="bubble out">Honestly that's most people who start 👍 The whole thing is built for total beginners — we hand you the products, the funnels and the ads. You don't make anything from scratch.</div>
+      <div class="voice"><span class="play">▶</span><span class="wave">▁▃▅▇▅▃▁▃▅▂ 0:14</span></div>
+      <div class="bubble in">how much is the elite thing again?</div>
+    </div>
+
+    <!-- AI suggestion + compose -->
+    <div class="compose">
+      <div class="ai-suggest">
+        <div class="label">🤖 AI suggested reply &nbsp;·&nbsp; confidence 86%</div>
+        <div class="txt">Great question! The Challenge itself is just $6.95 to start. The Elite license is our full done-for-you tier — I'd rather walk you through what's included on a quick call so it actually makes sense for your situation. Want me to grab you a time? 📅</div>
+        <div class="ai-actions">
+          <button class="btn send">Send ✓</button>
+          <button class="btn edit">Edit</button>
+          <button class="btn voice">🎙️ Voice note ▾</button>
+          <button class="btn skip">Skip / take over</button>
+        </div>
+      </div>
+      <div class="inputrow">
+        <input placeholder="Or type your own reply...">
+        <button class="btn send">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: lead panel -->
+  <div class="panel">
+    <div class="lead-name">Sarah J.</div>
+    <div style="color:var(--muted);font-size:12px;margin-top:2px;">@sarahj_fit</div>
+
+    <h4>Lead status</h4>
+    <div class="row"><span class="k">Stage</span><span>Qualifying</span></div>
+    <div class="row"><span class="k">Source</span><span>IG Ad — Quote #4</span></div>
+    <div class="row"><span class="k">Bought $6.95?</span><span>No</span></div>
+    <div class="row"><span class="k">First DM</span><span>Today</span></div>
+
+    <h4>AI read</h4>
+    <span class="pill">Beginner</span><span class="pill">Price-sensitive</span><span class="pill">Warm</span>
+
+    <h4>Next step</h4>
+    <div style="font-size:13px;color:var(--text);line-height:1.4;">Push for the booking link once she reacts to price.</div>
+  </div>
+
+</body>
+</html>
