@@ -71,9 +71,9 @@ async function mc(endpoint, body) {
   });
   return r.json().catch(() => ({ ok: r.ok }));
 }
-// free-text reply to a subscriber
+// free-text reply to a subscriber (Telegram; no message_tag — Meta deprecated tags)
 const sendText = (subscriber_id, text) =>
-  mc('/fb/sending/sendContent', { subscriber_id, data: { version: 'v2', content: { messages: [{ type: 'text', text }] } }, message_tag: 'ACCOUNT_UPDATE' });
+  mc('/fb/sending/sendContent', { subscriber_id, data: { version: 'v2', content: { type: 'telegram', messages: [{ type: 'text', text }] } } });
 // fire a SAVED ManyChat automation (booking/qualify/tag sequence) — THE hand-off
 const sendFlow = (subscriber_id, flow_ns) => mc('/fb/sending/sendFlow', { subscriber_id, flow_ns });
 
