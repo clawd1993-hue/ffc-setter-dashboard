@@ -491,7 +491,9 @@ function statusOf(c) {
   }
   // last was the lead (inbound) OR only a bot automation (mirror) → a setter needs to act = review.
   // Exception: a setter manually marked replied AFTER the last inbound (auto-reverts on next inbound).
-  if (last.dir === 'in' && c.manualRepliedAt && last.t <= c.manualRepliedAt) return 'replied';
+  // manual "mark replied" (for leads handled natively in ManyChat): holds Replied until a NEW
+  // message lands after the mark (lead reply OR bot mirror), which auto-reverts it to review.
+  if (c.manualRepliedAt && last.t <= c.manualRepliedAt) return 'replied';
   return 'review';
 }
 app.get('/api/conversations', (_req, res) =>
