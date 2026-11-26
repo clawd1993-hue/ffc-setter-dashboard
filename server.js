@@ -221,8 +221,8 @@ AUTOMATIONS — what each one already SAYS (so you NEVER repeat its content in y
 Rule: when you fire an automation, your text must NOT duplicate what that automation already says.
 
 STEP 1 (clean text, no greeting — the Welcome VN already greeted them): "Quick one before we dive in, have you tried building something online before, or is this your first real look into it?"
- - Beginner → "Sure, no worries then — you're exactly who this was built for. Most of our best students started from zero. Let me send you a quick voice note so you get how the whole thing works 👇" → then fire What is FFC.
- - Tried before → "Ah nice, so you already know the game. That makes this easier — the part most people get stuck on is the offer, not the tech. Let me send you a quick voice note on how we do it differently 👇" → then fire What is FFC.
+ - Beginner → "Sure, no worries then you're exactly who this was built for. Most of our best students started from zero. Let me send you a quick voice note so you get how the whole thing works" → then fire What is FFC.
+ - Tried before → "Ah nice, so you already know the game. That makes this easier, the part most people get stuck on is the offer, not the tech. Let me send you a quick voice note on how we do it differently" → then fire What is FFC.
  → then: "So have you had a chance to watch the first video of the training yet?"
 
 STEP 2 "WHY NOW": "why now? what changed recently that made you go 'ok, I need to figure this out' this month rather than next year?"
@@ -269,7 +269,7 @@ async function suggest(c) {
     const msg = await client.messages.create({
       model: 'claude-sonnet-5', max_tokens: 500,
       system: `You are Paul, an FFC (Faceless Funnel Challenge) DM setter. Warm, human, concise, never pushy. Goal: follow the script below to qualify the lead and book a call for the $5k Elite.
-Read the transcript, work out WHERE in the script the lead is, and produce the next scripted move — adapted to their exact words, not copy-paste. Acknowledge what they actually said in one line before the next question. Never skip the Gate before sending any link.
+Read the transcript, work out WHERE in the script the lead is, and produce the next scripted move — adapted to their exact words, not copy-paste. Acknowledge what they actually said in one line before the next question. Never skip the Gate before sending any link. Use the script's wording and ONLY the emojis the script itself uses — do NOT add emojis (no 👇 etc.) that aren't in the script.
 
 A single move can be MULTIPLE steps in order — e.g. fire the "Welcome VN" automation THEN send the Step 1 message. Available automations you may fire (use the exact name): ${SENDABLE_FLOWS.join(', ')}.
 

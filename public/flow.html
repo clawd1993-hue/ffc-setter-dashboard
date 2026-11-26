@@ -121,11 +121,11 @@ function seed(){
   const WHY_WATCHED={title:'STEP 2 · Why now (watched)', steps:[
     {t:'msg', text:"Nice, so you've seen the whole picture now 👌 And so why now? What changed recently that made you go 'ok, I need to figure this out' this month rather than next year?"}]};
   const WHY_NOT={title:'STEP 2 · Why now (not watched)', steps:[
-    {t:'msg', text:"Ok no worries! It's only 10 min and everything after makes way more sense once you've seen it 🙌 While you get to it — why now? What changed recently that made you go 'ok, I need to figure this out' this month rather than next year?"}]};
+    {t:'msg', text:"Ok no worries! It's only 10 min and everything after makes way more sense once you've seen it 🙌 While you get to it, why now? What changed recently that made you go 'ok, I need to figure this out' this month rather than next year?"}]};
   const WHY_LINK={title:"STEP 2 · Can't find the link", steps:[
     {t:'msg',  text:"No stress, here's your access 💪 opens best on your phone, I'll get the team to email it too. Everything you purchased is on that page, full curriculum under the videos."},
     {t:'flow', name:'FFC Access Link'},
-    {t:'msg',  text:'While you get to it — curious to know, why now? What changed recently?'}]};
+    {t:'msg',  text:'While you get to it, curious to know why now? What changed recently?'}]};
 
   // STEP 1 (A batch — fire VN then message — is ONE bubble). Two bridges, each with its OWN Step 2 cluster.
   nodes=[
@@ -134,12 +134,12 @@ function seed(){
       {t:'msg',  text:'Quick one before we dive in, have you tried building something online before, or is this your first real look into it?'},
     ]},
     {id:'n2', x:1000, y:470, title:'Bridge · Beginner', steps:[
-      {t:'msg',  text:"Sure, no worries then — you're exactly who this was built for. Most of our best students started from zero. Let me send you a quick voice note so you get how the whole thing works 👇"},
+      {t:'msg',  text:"Sure, no worries then you're exactly who this was built for. Most of our best students started from zero. Let me send you a quick voice note so you get how the whole thing works"},
       {t:'flow', name:'What is FFC'},
       {t:'msg',  text:'So have you had a chance to watch the first video of the training yet?'},
     ]},
     {id:'n3', x:2400, y:470, title:'Bridge · Tried before', steps:[
-      {t:'msg',  text:'Ah nice, so you already know the game. That makes this easier — the part most people get stuck on is the offer, not the tech. Let me send you a quick voice note on how we do it differently 👇'},
+      {t:'msg',  text:'Ah nice, so you already know the game. That makes this easier, the part most people get stuck on is the offer, not the tech. Let me send you a quick voice note on how we do it differently'},
       {t:'flow', name:'What is FFC'},
       {t:'msg',  text:'So have you had a chance to watch the first video of the training yet?'},
     ]},
