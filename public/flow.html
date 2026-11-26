@@ -152,6 +152,18 @@ function seed(){
     {id:'t_n', x:2400, y:1000, ...WHY_NOT},
     {id:'t_l', x:2720, y:1000, ...WHY_LINK},
   ];
+  // STEP 3 (CANONICAL — built once under Beginner→Watched to show the shape; see chat re: duplication).
+  // Acknowledge their WHY-NOW, then the next question. Verbatim from the script.
+  nodes.push(
+    {id:'s3_job', x:180,  y:1380, title:'STEP 3 · Why now: job stress / hate 9–5', steps:[
+      {t:'msg', text:"Yeah, trading hours for money gets old fast, makes sense you're looking. Have you tried anything before to get out of it, like a course or coaching, or is this your first real go?"}]},
+    {id:'s3_money', x:560, y:1380, title:'STEP 3 · Why now: money tight / debt', steps:[
+      {t:'msg', text:"I hear you! so this isn't a 'nice to have', it's a real need right now. So what's the setup right now? Working full-time, running something of your own, or in between?"}]},
+    {id:'s3_fam', x:940,  y:1380, title:'STEP 3 · Why now: family / freedom / time', steps:[
+      {t:'msg', text:"Love that! so it's about buying your time back, not just the money. What's the setup right now? Working full-time, running something of your own, or in between?"}]},
+    {id:'s3_mon', x:1320, y:1380, title:'STEP 3 · Why now: just money / 2nd income', steps:[
+      {t:'msg', text:"Fair! And what would actually change for you if this worked? Not the money itself, what it's for?"}]},
+  );
   edges=[
     {from:'n1', to:'n2', label:'Beginner / first look'},
     {from:'n1', to:'n3', label:'Tried before'},
@@ -161,6 +173,11 @@ function seed(){
     {from:'n3', to:'t_w', label:'Watched'},
     {from:'n3', to:'t_n', label:'Not watched'},
     {from:'n3', to:'t_l', label:'Send me the link'},
+    // Step 3 branches off the (canonical) Beginner→Watched bubble
+    {from:'b_w', to:'s3_job',   label:'Job stress / 9-5'},
+    {from:'b_w', to:'s3_money', label:'Money tight'},
+    {from:'b_w', to:'s3_fam',   label:'Family / freedom'},
+    {from:'b_w', to:'s3_mon',   label:'Just money'},
   ];
   uid=4;
   renderNodes(); drawWires();
