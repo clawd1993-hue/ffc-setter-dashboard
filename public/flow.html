@@ -200,7 +200,7 @@ function renderNodes(){
     el.className='node'; el.dataset.id=n.id;
     el.style.left=n.x+'px'; el.style.top=n.y+'px';
     if(n.kind==='route'){
-      el.className='node route'+(n.id===CUR?'':'');
+      el.className='node route';
       el.innerHTML=`
         <div class="port in" data-port="in"></div>
         <div class="routelabel">${esc(n.title)}</div>
