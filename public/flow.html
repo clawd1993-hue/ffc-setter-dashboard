@@ -240,7 +240,7 @@ function seed(){
     {from:'rt_setupA', to:'sit_between', label:'In between / laid off'},
     {from:'sit_work', to:'rt_inv'}, {from:'sit_own', to:'rt_inv'}, {from:'sit_study', to:'rt_inv'}, {from:'sit_between', to:'rt_inv'},
     // Job stress asked invested directly → into the invested route
-    {from:'s3_job', to:'rt_inv', label:'asked invested directly'},
+    {from:'s3_job', to:'rt_inv', bow:'left', bowAmt:560, label:'asked invested directly'},
     {from:'rt_inv', to:'inv_yes',   label:'Yes, it helped'},
     {from:'rt_inv', to:'inv_no',    label:'No / never'},
     {from:'rt_inv', to:'inv_tried', label:"Tried, didn't follow through"},
