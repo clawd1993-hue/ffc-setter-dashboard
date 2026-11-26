@@ -334,6 +334,7 @@ async function generateFuSuggestion(c, step) {
     const Anthropic = require('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
     const transcript = transcriptOf(c);
+    const firstName = c.firstName || (c.realName || '').trim().split(/\s+/)[0] || (c.name || '').trim().split(/\s+/)[0] || '';
     const tone = step <= 2 ? 'gentle' : step <= 4 ? 'a bit more direct' : 'a graceful break-up (give them an easy out)';
     const msg = await client.messages.create({
       model: 'claude-sonnet-5', max_tokens: 200,
@@ -356,7 +357,7 @@ ${FU_BANK}
 
 SCRIPT (reference ONLY — to identify the stage; do NOT copy lines from it):
 ${MAIN_SCRIPT}`,
-      messages: [{ role: 'user', content: `Transcript so far:\n${transcript}\n\nWrite follow-up #${step}.` }],
+      messages: [{ role: 'user', content: `The lead's first name is: ${firstName || '(unknown)'} — use it to fill any [name] token (never leave the literal "[name]" in the output; if unknown, drop it).\n\nTranscript so far:\n${transcript}\n\nWrite follow-up #${step}.` }],
     });
     const fuOut = (msg.content.find(b => b.type === 'text') || {}).text || '';
     c.fuSuggestion = { text: fuOut.trim(), step, t: Date.now() };
