@@ -257,15 +257,14 @@ async function open_(id,keepDraft){
   const sug=c.suggestion;
   document.getElementById('thread').innerHTML=`
     <div class="thread-head">
-      <div class="avatar" style="background:${c.avatarColor};width:38px;height:38px;flex:0 0 38px;font-size:14px;">${esc((c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2))}</div>
+      <div class="avatar" style="background:${c.avatarColor};width:38px;height:38px;flex:0 0 38px;font-size:14px;">${esc(((c.realName||c.name)||'?').split(' ').map(w=>w[0]).join('').slice(0,2))}</div>
       <div>
-        <div class="name">${esc(c.name)}</div>
-        ${c.realName?`<div class="realname" title="Real name from checkout (GHL)">👤 ${esc(c.realName)}</div>`:''}
+        <div class="name">${esc(c.realName||c.name)}</div>
         <div class="sub">${c.email?'✉️ '+esc(c.email):esc(c.channel)}</div>
       </div>
       ${c.closed
         ?`<button class="btn reopen-lead" onclick="reopenLead('${c.id}')" title="Move back to the active inbox">↩︎ Reopen</button>`
-        :`<button class="btn close-lead" onclick="askCloseLead('${c.id}','${esc(c.name).replace(/'/g,"\\'")}')">Close Lead</button>`}
+        :`<button class="btn close-lead" onclick="askCloseLead('${c.id}','${esc(c.realName||c.name).replace(/'/g,"\\'")}')">Close Lead</button>`}
       <div class="mode-toggle" title="Goal: full auto mode (locked for now)">Mode:
         <div class="switch disabled">
           <div class="${c.mode==='approve'?'on':''}">Approve</div>

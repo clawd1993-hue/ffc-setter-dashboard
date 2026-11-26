@@ -375,7 +375,8 @@ function statusOf(c) {
   return 'review';
 }
 app.get('/api/conversations', (_req, res) =>
-  res.json(db.conversations.map(c => ({ id: c.id, name: c.name, handle: c.handle, channel: c.channel, avatarColor: c.avatarColor, mode: c.mode, tag: statusOf(c), closed: !!c.closed, updated: c.updated, preview: (c.messages.at(-1) || {}).text || '' }))));
+  // display name = real GHL checkout name whenever we have it; TG name / "Lead 1234" is only a fallback
+  res.json(db.conversations.map(c => ({ id: c.id, name: c.realName || c.name, handle: c.handle, channel: c.channel, avatarColor: c.avatarColor, mode: c.mode, tag: statusOf(c), closed: !!c.closed, updated: c.updated, preview: (c.messages.at(-1) || {}).text || '' }))));
 
 app.get('/api/conversation/:id', async (req, res) => {
   const c = convo(req.params.id); if (!c) return res.status(404).json({ error: 'not found' });
