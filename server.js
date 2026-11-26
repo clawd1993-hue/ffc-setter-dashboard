@@ -31,6 +31,9 @@ const MC_BASE = 'https://api.manychat.com';
 const GHL_API_KEY = process.env.GHL_API_KEY || '';
 const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || 'tXCdfKQO75A9wknq5eOa';
 const GHL_BASE = 'https://services.leadconnectorhq.com';
+// Telegram media (via the ffc-tg-proxy that sits in front of ManyChat)
+const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || '';           // FFC setter bot token (for getFile + download)
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';       // Whisper transcription for voice notes
 const STORE = path.join(__dirname, 'conversations.json');
 
 // ---------- Supabase (persistent store, survives deploys) ----------
@@ -327,6 +330,64 @@ app.post('/api/mode', (req, res) => {
   const { id, mode } = req.body; const c = convo(id); if (!c) return res.status(404).json({ error: 'not found' });
   c.mode = mode === 'auto' ? 'auto' : 'approve'; c.tag = c.mode === 'auto' ? 'auto' : 'review'; touch(c);
   res.json({ ok: true, mode: c.mode });
+});
+
+// ---------- Telegram media ingest (from ffc-tg-proxy) ----------
+// Resolve a Telegram file_id -> fresh temporary download URL (file_path expires, file_id doesn't)
+async function tgFileUrl(fileId) {
+  if (!TG_BOT_TOKEN) return null;
+  const r = await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/getFile?file_id=${encodeURIComponent(fileId)}`);
+  const d = await r.json().catch(() => null);
+  const fp = d && d.result && d.result.file_path;
+  return fp ? `https://api.telegram.org/file/bot${TG_BOT_TOKEN}/${fp}` : null;
+}
+
+// transcribe a voice/audio file_id with Whisper -> set message.transcript + readable text
+async function transcribeVoice(c, msg) {
+  if (!OPENAI_API_KEY) return;
+  try {
+    const url = await tgFileUrl(msg.fileId);
+    if (!url) return;
+    const audio = await (await fetch(url)).arrayBuffer();
+    const form = new FormData();
+    form.append('file', new Blob([audio]), 'voice.ogg');
+    form.append('model', 'whisper-1');
+    const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST', headers: { Authorization: `Bearer ${OPENAI_API_KEY}` }, body: form,
+    });
+    const d = await r.json().catch(() => null);
+    if (d && d.text) { msg.transcript = d.text.trim(); msg.text = `🎙️ Voice note (transcribed): ${msg.transcript}`; touch(c); }
+  } catch (e) { console.error('[whisper] failed:', e.message); }
+}
+
+app.post('/ingest/tg-media', async (req, res) => {
+  const b = req.body || {};
+  const sid = String(b.subscriber_id || '').trim();
+  if (!sid || !b.file_id) return res.status(400).json({ error: 'need subscriber_id + file_id' });
+  let c = db.conversations.find(x => x.subscriber_id === sid);
+  if (!c) {
+    c = { id: 'mc-' + sid, subscriber_id: sid, name: b.name || (b.username ? '@' + b.username : 'Lead ' + sid.slice(-4)), handle: b.username ? '@' + b.username : '', channel: 'Telegram', avatarColor: '#0084FF', mode: 'approve', tag: 'review', updated: Date.now(), lead: {}, aiRead: [], nextStep: '', messages: [], suggestion: null };
+    db.conversations.unshift(c);
+  }
+  const type = b.type || 'document';
+  const labels = { image: '📷 Photo', voice: '🎙️ Voice note', audio: '🎵 Audio', video: '🎬 Video', document: '📄 ' + (b.file_name || 'File') };
+  const msg = { dir: 'in', t: b.t || Date.now(), mediaType: type, fileId: b.file_id, text: b.caption || labels[type] || '📎 Attachment', mirror: true };
+  c.messages.push(msg); touch(c);
+  res.json({ ok: true, id: c.id });
+  if (type === 'voice' || type === 'audio') transcribeVoice(c, msg); // async, updates in place
+});
+
+// serve a Telegram file through us so the bot token never hits the browser
+app.get('/tg-file/:fileId', async (req, res) => {
+  try {
+    const url = await tgFileUrl(req.params.fileId);
+    if (!url) return res.status(404).send('no file');
+    const r = await fetch(url);
+    if (!r.ok) return res.status(502).send('fetch fail');
+    res.set('Content-Type', r.headers.get('content-type') || 'application/octet-stream');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(Buffer.from(await r.arrayBuffer()));
+  } catch (e) { res.status(500).send(e.message); }
 });
 
 // 5b) manually mark a lead "Replied" (ManyChat not synced). Auto-reverts to "review"

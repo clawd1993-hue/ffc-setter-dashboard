@@ -65,6 +65,11 @@
   .bubble.media img{display:block;width:100%;border-radius:12px;cursor:pointer;}
   .bubble.media .cap{padding:6px 8px 2px;font-size:13px;}
   .bubble.medianote{font-style:italic;opacity:.85;}
+  .bubble.media video{display:block;width:100%;max-width:260px;border-radius:12px;}
+  .bubble.voice{padding:8px 10px;max-width:70%;}
+  .bubble.voice audio{display:block;width:230px;max-width:100%;}
+  .bubble.voice .cap{font-size:13px;line-height:1.4;margin-top:6px;}
+  .bubble .cap.muted{color:var(--muted);font-style:italic;}
   .stamp{align-self:center;color:var(--muted);font-size:11px;margin:4px 0;}
   .compose{border-top:1px solid var(--line);padding:14px 20px;background:#fff;position:relative;}
   .auto-btn{background:#fff;border:1px solid var(--line);color:var(--blue);font-size:17px;padding:8px 13px;line-height:1;}
@@ -263,6 +268,14 @@ async function open_(id,keepDraft){
     </div>
     <div class="msgs" id="msgs">${c.messages.map(m=>{
         const base=`bubble ${m.dir==='in'?'in':'out'}${m.mirror?' mirror':''}`;
+        // real Telegram media (via the proxy) — served through /tg-file so the bot token stays server-side
+        if(m.fileId){
+          const src='/tg-file/'+encodeURIComponent(m.fileId);
+          if(m.mediaType==='image')return `<div class="${base} media"><a href="${src}" target="_blank" rel="noopener"><img src="${src}" alt="photo" loading="lazy"></a>${m.text&&!/^📷/.test(m.text)?`<div class="cap">${esc(m.text)}</div>`:''}</div>`;
+          if(m.mediaType==='video')return `<div class="${base} media"><video src="${src}" controls preload="metadata"></video>${m.text&&!/^🎬/.test(m.text)?`<div class="cap">${esc(m.text)}</div>`:''}</div>`;
+          if(m.mediaType==='voice'||m.mediaType==='audio')return `<div class="${base} voice"><audio src="${src}" controls preload="none"></audio>${m.transcript?`<div class="cap">🎙️ ${esc(m.transcript)}</div>`:`<div class="cap muted">transcribing…</div>`}</div>`;
+          return `<div class="${base}"><a href="${src}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(m.text||'📄 File')}</a></div>`;
+        }
         if(m.mediaUrl)return `<div class="${base} media"><a href="${esc(m.mediaUrl)}" target="_blank" rel="noopener"><img src="${esc(m.mediaUrl)}" alt="attachment" loading="lazy"></a>${m.text?`<div class="cap">${esc(m.text)}</div>`:''}</div>`;
         if(m.media)return `<div class="${base} medianote">${esc(m.text)}</div>`;
         return `<div class="${base}">${esc(m.text)}</div>`;
