@@ -265,7 +265,12 @@ function statusOf(c) {
   if (PIPE_TAGS.includes(c.tag)) return c.tag;     // a follow-up stage was explicitly set
   const last = c.messages && c.messages.at(-1);
   if (!last) return 'review';
-  return last.dir === 'out' ? 'replied' : 'review'; // out = we spoke last, in = waiting on us
+  if (last.dir === 'out') return 'replied';        // we spoke last
+  // last is inbound. Normally = review, UNLESS a setter manually marked it replied
+  // AFTER that inbound (used when ManyChat isn't synced). Auto-reverts: any NEW inbound
+  // (t > manualRepliedAt) wins back "review".
+  if (c.manualRepliedAt && last.t <= c.manualRepliedAt) return 'replied';
+  return 'review';
 }
 app.get('/api/conversations', (_req, res) =>
   res.json(db.conversations.map(c => ({ id: c.id, name: c.name, handle: c.handle, channel: c.channel, avatarColor: c.avatarColor, mode: c.mode, tag: statusOf(c), closed: !!c.closed, updated: c.updated, preview: (c.messages.at(-1) || {}).text || '' }))));
@@ -301,6 +306,20 @@ app.post('/api/mode', (req, res) => {
   const { id, mode } = req.body; const c = convo(id); if (!c) return res.status(404).json({ error: 'not found' });
   c.mode = mode === 'auto' ? 'auto' : 'approve'; c.tag = c.mode === 'auto' ? 'auto' : 'review'; touch(c);
   res.json({ ok: true, mode: c.mode });
+});
+
+// 5b) manually mark a lead "Replied" (ManyChat not synced). Auto-reverts to "review"
+// on their next inbound message. Pass {id} or {email} or {name} to match.
+app.post('/api/mark-replied', (req, res) => {
+  const b = req.body || {};
+  const want = (b.replied === false) ? false : true;
+  let c = b.id && convo(b.id);
+  if (!c && b.email) { const e = String(b.email).toLowerCase(); c = db.conversations.find(x => (x.email || '').toLowerCase() === e); }
+  if (!c && b.name) { const n = String(b.name).toLowerCase().trim(); c = db.conversations.find(x => (x.name || '').toLowerCase().trim() === n || (x.realName || '').toLowerCase().trim() === n); }
+  if (!c) return res.status(404).json({ error: 'not found', q: b });
+  c.manualRepliedAt = want ? Date.now() : 0;
+  touch(c);
+  res.json({ ok: true, id: c.id, name: c.name, status: statusOf(c) });
 });
 
 // 6) close / reopen a lead (moves them to the Closed list)
