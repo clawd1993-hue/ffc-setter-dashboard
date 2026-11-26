@@ -171,6 +171,44 @@ function seed(){
       {t:'msg', text:'Ah, sorry to hear that, way more common than people admit. What was missing last time - the info, or the support after you invested?'}]},
     {id:'s3_tried', x:895, y:1840, title:'STEP 3 · Tried stuff before / nothing worked', steps:[
       {t:'msg', text:"So you've already put in effort and it didn't pay off, that's actually the exact person this works best for. What was missing last time - the info, or the support after you invested?"}]},
+
+    // ===== STEP 3 → GATE · RIGHT sub-tree: SITUATION (Money/Family) → INVESTED → Gate =====
+    {id:'rt_setupA', x:1780, y:2240, kind:'route', title:'They answer: work setup?'},
+    {id:'sit_work',    x:1340, y:2580, title:'Setup · Working / job', steps:[
+      {t:'msg', text:"Got it, so this would run alongside the job for now, that's how most people start 💪 And have you ever invested in a course or coaching before to learn this kind of thing?"}]},
+    {id:'sit_own',     x:1780, y:2580, title:'Setup · Own business', steps:[
+      {t:'msg', text:'Nice, so you already think like an owner. That\'s half the battle. And have you ever invested in a course or coaching before?'}]},
+    {id:'sit_study',   x:2220, y:2580, title:'Setup · Studying', steps:[
+      {t:'msg', text:"Cool! so time's probably on your side, budget maybe less so. And have you ever invested in a course or coaching before?"}]},
+    {id:'sit_between', x:2660, y:2580, title:'Setup · In between / laid off', steps:[
+      {t:'msg', text:'Got it. So this could actually be the thing you build into, not just on the side. And have you ever invested in a course or coaching before?'}]},
+    {id:'rt_inv', x:1780, y:3000, kind:'route', title:'They answer: invested in a course/coaching before?'},
+    {id:'inv_yes',   x:1340, y:3300, title:'Invested · Yes, it helped', steps:[
+      {t:'msg', text:'Nice, so you already know investing in the right help speeds things up.'}]},
+    {id:'inv_no',    x:1780, y:3300, title:'Invested · No / never', steps:[
+      {t:'msg', text:'Okay, so this is the first time you\'re taking it seriously. (makes sense to be cautious then)'}]},
+    {id:'inv_tried', x:2220, y:3300, title:'Invested · Tried but didn\'t follow through', steps:[
+      {t:'msg', text:"So you've already put in effort and it didn't pay off, and it wasn't the info, it was doing it alone that got [their word]. That's actually the exact person this works best for."}]},
+
+    // ===== STEP 3 → GATE · LEFT sub-tree: WHAT WAS MISSING → setup (acknowledge-only) → Gate =====
+    {id:'rt_miss', x:700, y:2240, kind:'route', title:'They answer: the info, or the support?'},
+    {id:'miss_support', x:480, y:2580, title:'What was missing · Support / doing it alone', steps:[
+      {t:'msg', text:"So it wasn't the info, it was doing it alone that got [their word: overwhelming / no one to ask / no follow-through / where it fell apart]. That's actually the exact person this works best for. So what's the setup right now? Working full-time, running something of your own, or in between?"}]},
+    {id:'miss_info', x:920, y:2580, title:'What was missing · Just the info / roadmap', steps:[
+      {t:'msg', text:"I hear you! so you had the drive, just not the roadmap and guidance. So what's the setup right now? Working full-time, running something of your own, or in between?"}]},
+    {id:'rt_setupB', x:700, y:3000, kind:'route', title:'They answer: work setup? (invested already known → skip course Q)'},
+    {id:'ack_work',    x:180,  y:3300, title:'Setup (ack-only) · Working / job', steps:[
+      {t:'msg', text:"Got it, so this would run alongside the job for now, that's how most people start 💪"}]},
+    {id:'ack_own',     x:620,  y:3300, title:'Setup (ack-only) · Own business', steps:[
+      {t:'msg', text:'Nice, so you already think like an owner. That\'s half the battle.'}]},
+    {id:'ack_study',   x:1060, y:3300, title:'Setup (ack-only) · Studying', steps:[
+      {t:'msg', text:"Cool! so time's probably on your side, budget maybe less so."}]},
+    {id:'ack_between', x:1500, y:3300, title:'Setup (ack-only) · In between / laid off', steps:[
+      {t:'msg', text:'Got it. So this could actually be the thing you build into, not just on the side.'}]},
+
+    // ===== STEP 4 · THE GATE =====
+    {id:'gate', x:1540, y:3760, title:'STEP 4 · THE GATE (EVERY LEAD, before ANY link)', steps:[
+      {t:'msg', text:'If we walked you through how our team can shortcut all this for you, and it felt like the right fit, are you in a position to invest in that right now, or would it be more of a future thing?'}]},
   );
   edges=[
     {from:'n1', to:'n2', label:'Beginner / first look'},
@@ -193,6 +231,31 @@ function seed(){
     {from:'hub3', to:'s3_tried',  label:'Tried, nothing worked'},
     // "just money" surfaces their real why → route it like a why-now (loops back to the hub)
     {from:'s3_mon', to:'hub3', loop:true, label:'↩ loops back — re-route by their real why'},
+
+    // RIGHT sub-tree: Money/Family ask situation → work-setup route → 4 replies (with course Q) → invested route
+    {from:'s3_money', to:'rt_setupA'}, {from:'s3_fam', to:'rt_setupA'},
+    {from:'rt_setupA', to:'sit_work',    label:'Working / job'},
+    {from:'rt_setupA', to:'sit_own',     label:'Own business'},
+    {from:'rt_setupA', to:'sit_study',   label:'Studying'},
+    {from:'rt_setupA', to:'sit_between', label:'In between / laid off'},
+    {from:'sit_work', to:'rt_inv'}, {from:'sit_own', to:'rt_inv'}, {from:'sit_study', to:'rt_inv'}, {from:'sit_between', to:'rt_inv'},
+    // Job stress asked invested directly → into the invested route
+    {from:'s3_job', to:'rt_inv', label:'asked invested directly'},
+    {from:'rt_inv', to:'inv_yes',   label:'Yes, it helped'},
+    {from:'rt_inv', to:'inv_no',    label:'No / never'},
+    {from:'rt_inv', to:'inv_tried', label:"Tried, didn't follow through"},
+    {from:'inv_yes', to:'gate'}, {from:'inv_no', to:'gate'}, {from:'inv_tried', to:'gate'},
+
+    // LEFT sub-tree: Burned/Tried → info-or-support route → 2 replies (with setup Q) → setup route → ack-only → Gate
+    {from:'s3_burned', to:'rt_miss'}, {from:'s3_tried', to:'rt_miss'},
+    {from:'rt_miss', to:'miss_support', label:'Support / doing it alone'},
+    {from:'rt_miss', to:'miss_info',    label:'Just the info'},
+    {from:'miss_support', to:'rt_setupB'}, {from:'miss_info', to:'rt_setupB'},
+    {from:'rt_setupB', to:'ack_work',    label:'Working / job'},
+    {from:'rt_setupB', to:'ack_own',     label:'Own business'},
+    {from:'rt_setupB', to:'ack_study',   label:'Studying'},
+    {from:'rt_setupB', to:'ack_between', label:'In between / laid off'},
+    {from:'ack_work', to:'gate'}, {from:'ack_own', to:'gate'}, {from:'ack_study', to:'gate'}, {from:'ack_between', to:'gate'},
   ];
   uid=4;
   renderNodes(); drawWires();
