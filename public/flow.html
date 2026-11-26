@@ -214,7 +214,17 @@ function seed(){
       {t:'msg', text:"So it wasn't the info, it was doing it alone that got [their word: overwhelming / no one to ask / no follow-through / where it fell apart]. That's actually the exact person this works best for. So what's the setup right now? Working full-time, running something of your own, or in between?"}]},
     {id:'miss_info', x:2280, y:3840, title:'What was missing · Just the info / roadmap', steps:[
       {t:'msg', text:"I hear you! so you had the drive, just not the roadmap and guidance. So what's the setup right now? Working full-time, running something of your own, or in between?"}]},
-    {id:'gate', x:1360, y:4300, title:'STEP 4 · THE GATE (every lead, before ANY link)', steps:[
+    // invested already known here → after they give the setup, just ACKNOWLEDGE it (NO course/coaching question) → Gate
+    {id:'rt_setup2', x:2040, y:4160, kind:'route', title:'They answer: work setup? (invested already known → skip course Q)'},
+    {id:'ack_work',    x:1420, y:4440, title:'Setup · Working / job', steps:[
+      {t:'msg', text:"Got it, so this would run alongside the job for now, that's how most people start 💪"}]},
+    {id:'ack_own',     x:1860, y:4440, title:'Setup · Own business', steps:[
+      {t:'msg', text:'Nice, so you already think like an owner. That\'s half the battle.'}]},
+    {id:'ack_study',   x:2300, y:4440, title:'Setup · Studying', steps:[
+      {t:'msg', text:"Cool! so time's probably on your side, budget maybe less so."}]},
+    {id:'ack_between', x:2740, y:4440, title:'Setup · In between / laid off', steps:[
+      {t:'msg', text:'Got it. So this could actually be the thing you build into, not just on the side.'}]},
+    {id:'gate', x:1360, y:4920, title:'STEP 4 · THE GATE (every lead, before ANY link)', steps:[
       {t:'msg', text:'If we walked you through how our team can shortcut all this for you, and it felt like the right fit, are you in a position to invest in that right now, or would it be more of a future thing?'}]},
   );
   edges.push(
@@ -239,9 +249,15 @@ function seed(){
     {from:'inv_burned', to:'rt_miss'}, {from:'inv_triedfail', to:'rt_miss'},
     {from:'rt_miss', to:'miss_support', label:'Support / doing it alone'},
     {from:'rt_miss', to:'miss_info',    label:'Just the info'},
-    // yes/no go straight to the Gate; the "what was missing" bubbles ask the setup Q then → Gate
+    // the "what was missing" bubbles asked the setup Q → converge → acknowledge-only (skip course Q) → Gate
+    {from:'miss_support', to:'rt_setup2'}, {from:'miss_info', to:'rt_setup2'},
+    {from:'rt_setup2', to:'ack_work',    label:'Working / job'},
+    {from:'rt_setup2', to:'ack_own',     label:'Own business'},
+    {from:'rt_setup2', to:'ack_study',   label:'Studying'},
+    {from:'rt_setup2', to:'ack_between', label:'In between / laid off'},
+    {from:'ack_work', to:'gate'}, {from:'ack_own', to:'gate'}, {from:'ack_study', to:'gate'}, {from:'ack_between', to:'gate'},
+    // yes/no (invested already resolved, no "what was missing") go straight to the Gate
     {from:'inv_yes', to:'gate'}, {from:'inv_no', to:'gate'},
-    {from:'miss_support', to:'gate'}, {from:'miss_info', to:'gate'},
   );
   uid=4;
   renderNodes(); drawWires();
