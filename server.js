@@ -298,14 +298,24 @@ app.post('/manychat/mirror', (req, res) => {
 
 // 2) dashboard feeds
 // status is DERIVED from the last message: they messaged last -> "review" (needs reply);
-// we messaged last -> "replied". Explicit follow-up stages (fu1..fue3) are a separate pipeline and win.
-const PIPE_TAGS = ['fu1', 'fu2', 'fu3', 'fu4', 'fu5', 'fue1', 'fue2', 'fue3'];
+// we messaged last & recent -> "replied"; we messaged last & gone quiet -> escalates into the
+// follow-up ladder FU1..FU5 by how long they've been silent (Follow-Up system, Phase 1 plumbing).
+// Cumulative hours of silence (from our last message) to reach each step. CONFIG — tweakable.
+// FU1 @1h, FU2 @+12h(=13), FU3 @+24h(=37), FU4 @+24h(=61), FU5 @+72h(=133).
+const FU_THRESHOLDS_H = [1, 13, 37, 61, 133];
+function fuStepForSilence(hours) {
+  let step = 0;
+  for (let i = 0; i < FU_THRESHOLDS_H.length; i++) if (hours >= FU_THRESHOLDS_H[i]) step = i + 1;
+  return step; // 0 = not overdue yet; 1..5 = FU step
+}
 function statusOf(c) {
-  if (PIPE_TAGS.includes(c.tag)) return c.tag;     // a follow-up stage was explicitly set
   const last = c.messages && c.messages.at(-1);
   if (!last) return 'review';
   if (last.forceReview) return 'review';           // last was automation narration (Welcome mirror), not a human reply
-  if (last.dir === 'out') return 'replied';        // we spoke last
+  if (last.dir === 'out') {                         // we spoke last
+    const step = fuStepForSilence((Date.now() - last.t) / 3600000);
+    return step ? ('fu' + step) : 'replied';        // recent = replied; aged = fu1..fu5
+  }
   // last is inbound. Normally = review, UNLESS a setter manually marked it replied
   // AFTER that inbound (used when ManyChat isn't synced). Auto-reverts: any NEW inbound
   // (t > manualRepliedAt) wins back "review".
