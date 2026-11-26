@@ -386,8 +386,12 @@ function resetView(){
   board.scrollTo({left:Math.max(0,left),top:0,behavior:'smooth'});
 }
 
-seed();
+try { seed(); } catch(err){ document.querySelector('.topbar .sub').textContent='INIT ERROR: '+err.message; console.error(err); }
 resetView();
+// debug readout: nodes / edges / wires actually drawn
+setTimeout(()=>{ const s=document.querySelector('.topbar .sub');
+  if(s && !s.textContent.startsWith('INIT')) s.textContent=`nodes ${nodes.length} · edges ${edges.length} · wires ${svg.querySelectorAll('.wire').length}`;
+},200);
 </script>
 </body>
 </html>
