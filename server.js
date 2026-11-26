@@ -200,10 +200,22 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// DEBUG: ring buffer of the last raw inbound payloads (to discover what ManyChat sends on media)
+const RAW_INBOUND = [];
+function captureRaw(tag, body) {
+  RAW_INBOUND.unshift({ t: new Date().toISOString(), tag, body });
+  if (RAW_INBOUND.length > 20) RAW_INBOUND.pop();
+}
+app.get('/api/debug/inbound', (req, res) => {
+  if (req.query.key !== 'clawd26') return res.status(403).json({ error: 'nope' });
+  res.json(RAW_INBOUND);
+});
+
 // 1) ManyChat External Request lands here on every inbound message
 app.post('/manychat/inbound', async (req, res) => {
   // ManyChat passes subscriber fields; accept many possible shapes/keys
   const b = req.body || {};
+  captureRaw('inbound', b);
   const pickv = (...ks) => { for (const k of ks) { if (b[k] != null && String(b[k]).trim() !== '') return String(b[k]).trim(); } return ''; };
   try { fs.appendFileSync(path.join(__dirname, 'inbound.log'), new Date().toISOString() + ' ' + JSON.stringify(b) + '\n'); } catch {}
   const sid = pickv('subscriber_id', 'id', 'user_id', 'contact_id', 'key') || 'unknown';
