@@ -210,6 +210,38 @@ function seed(){
     // ===== STEP 4 · THE GATE =====
     {id:'gate', x:1540, y:3760, title:'STEP 4 · THE GATE (EVERY LEAD, before ANY link)', steps:[
       {t:'msg', text:'If we walked you through how our team can shortcut all this for you, and it felt like the right fit, are you in a position to invest in that right now, or would it be more of a future thing?'}]},
+
+    // ===== GATE → 🟢 GREEN =====
+    {id:'green1', x:420, y:4160, title:'🟢 GREEN · goal + proof + plan', steps:[
+      {t:'msg',  text:"Okay, then let's get you moving 👌 You said you want [their thing]. Let me show you what that actually looks like"},
+      {t:'flow', name:'Proof'},
+      {t:'msg',  text:"The fastest way there is this: we build your site, load it with the proven products and set up your first ad, so you're selling in days, not months. Our Head Coach can walk you through exactly how that'd look on a quick call, she only takes a few a week. Want me to grab you a spot with her this week?"}]},
+    {id:'rt_greenyes', x:420, y:4620, kind:'route', title:'They say YES to the call?'},
+    {id:'green_book', x:420, y:4900, title:'🟢 Book the call', steps:[
+      {t:'msg',  text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'flow', name:'Booking Link'}]},
+
+    // ===== GATE → 🟡 YELLOW (isolate → objection types) =====
+    {id:'yellow1', x:1540, y:4160, title:'🟡 YELLOW · isolate (no link yet)', steps:[
+      {t:'msg', text:"Totally fair. Just so I understand, is it more the investment side, or more that you're not sure this would actually work for you?"}]},
+    {id:'rt_yellow', x:1540, y:4620, kind:'route', title:'They answer: which objection?'},
+    {id:'y_2a', x:360,  y:4900, title:'🟡 Price · HAS income', steps:[
+      {t:'msg', text:'Got it. If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+    {id:'y_2b', x:820,  y:4900, title:'🟡 Price · NO income (max 3 msgs, never a number)', steps:[
+      {t:'msg', text:'Is the investment the only thing, or do you want to see if the value makes sense first?'}]},
+    {id:'y_2c', x:1280, y:4900, title:'🟡 Fit / doubt (not sure it\'d work)', steps:[
+      {t:'msg', text:'Got it, smart to be cautious. So let me not sell you anything: what would make this a yes for you?'}]},
+    {id:'y_2d', x:1740, y:4900, title:'🟡 DIY (I\'ll try myself)', steps:[
+      {t:'msg', text:'Sure, and you can. One thing: testing the offer, funnel and ads yourself is exactly where the ad spend goes before you find what works.'}]},
+    {id:'y_2e', x:2200, y:4900, title:'🟡 Time (too busy)', steps:[
+      {t:'msg', text:"Totally get it, life's full. But will next month actually be less busy? The fact you don't have time is probably why you need this more. We build the whole thing so it doesn't eat your week. How many hours a week could you realistically give it?"}]},
+    {id:'y_2f', x:2660, y:4900, title:'🟡 Authority (talk to partner)', steps:[
+      {t:'msg', text:'Makes sense. One thing: if you went to them today and they asked what you think, would you say it\'s the right move, or still have doubts yourself?'}]},
+
+    // ===== GATE → 🔴 RED =====
+    {id:'red1', x:2860, y:4160, title:'🔴 RED · downsell to the challenge (no call/proof/link)', steps:[
+      {t:'msg', text:"No worries, I understand 🙏 Then the right move right now is the challenge, not Elite. You've got the training and products, you can get first sales on your own, I'm here to answer questions. When you're in a better position to go full force, reach back and we'll set up the call. I'll check in with you on [date] 🙌"}]},
+    {id:'red_note', x:2860, y:4620, kind:'route', title:'→ cancel Calendly · tag UQ-red · check-in date 2–4 weeks out'},
   );
   edges=[
     {from:'n1', to:'n2', label:'Beginner / first look'},
@@ -257,6 +289,24 @@ function seed(){
     {from:'rt_setupB', to:'ack_study',   label:'Studying'},
     {from:'rt_setupB', to:'ack_between', label:'In between / laid off'},
     {from:'ack_work', to:'gate'}, {from:'ack_own', to:'gate'}, {from:'ack_study', to:'gate'}, {from:'ack_between', to:'gate'},
+
+    // Gate → 3 branches
+    {from:'gate', to:'green1',  label:'🟢 Yes / open / has income'},
+    {from:'gate', to:'yellow1', label:'🟡 Future / not sure'},
+    {from:'gate', to:'red1',    label:'🔴 No money for now'},
+    // Green chain
+    {from:'green1', to:'rt_greenyes'},
+    {from:'rt_greenyes', to:'green_book', label:'YES → book'},
+    // Yellow: isolate → objection route → 6 types
+    {from:'yellow1', to:'rt_yellow'},
+    {from:'rt_yellow', to:'y_2a', label:'Price · has income'},
+    {from:'rt_yellow', to:'y_2b', label:'Price · no income'},
+    {from:'rt_yellow', to:'y_2c', label:"Not sure it'd work"},
+    {from:'rt_yellow', to:'y_2d', label:'Do it myself'},
+    {from:'rt_yellow', to:'y_2e', label:'Too busy / time'},
+    {from:'rt_yellow', to:'y_2f', label:'Talk to partner'},
+    // Red
+    {from:'red1', to:'red_note'},
   ];
   uid=4;
   applySavedPositions();   // overlay any positions you've dragged (saved in this browser)
