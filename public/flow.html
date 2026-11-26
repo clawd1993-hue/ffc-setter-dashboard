@@ -289,6 +289,14 @@ function seed(){
     {id:'y_2f_both', x:2660, y:5460, title:'🟡 2f · "I\'d recommend it" → both on the call', steps:[
       {t:'msg', text:"Perfect — then let's get you both on the call so you're aligned. Monday or Tuesday?"}]},
     {id:'rt_2f_yes', x:2660, y:5740, kind:'route', title:'Yes?'},
+
+    // v2: inline duplicates so paths flow straight down (no back-lines / circling)
+    {id:'y_2b_2c', x:560, y:6560, title:'🟡 2b · it was never the money', steps:[
+      {t:'msg', text:'So it was never really about the money then — let me not sell you anything, what would make this a yes for you?'}]},
+    {id:'y_2b_red', x:200, y:6560, title:'🔴 2b · hard no → downsell to challenge', steps:[
+      {t:'msg', text:"No worries, I understand 🙏 Then the right move right now is the challenge, not Elite. You've got the training and products, get your first sales on your own, I'm here for questions. When you're in a better spot, reach back and we'll set up the call. I'll check in with you on [date] 🙌"}]},
+    {id:'y_2f_2c', x:2480, y:6020, title:'🟡 2f · has doubts → what would make it a yes?', steps:[
+      {t:'msg', text:'Got it, smart to be cautious — so let me not sell you anything, what would make this a yes for you?'}]},
   );
   edges=[
     {from:'n1', to:'n2', label:'Beginner / first look'},
@@ -378,9 +386,10 @@ function seed(){
     {from:'rt_2b2', to:'y_book',    label:'yes'},
     {from:'rt_2b2', to:'y_2b_msg3', label:'no'},
     {from:'y_2b_msg3', to:'rt_2b3'},
-    {from:'rt_2b3', to:'y_book', label:'clear yes'},
-    {from:'rt_2b3', to:'y_2c',   label:"no/maybe → it's not the money"},
-    {from:'rt_2b3', to:'red1',   label:'hard no'},
+    {from:'rt_2b3', to:'y_book',   label:'clear yes'},
+    {from:'rt_2b3', to:'y_2b_2c', label:"no/maybe → it's not the money"},
+    {from:'rt_2b3', to:'y_2b_red', label:'hard no'},
+    {from:'y_2b_2c', to:'proof_prop'},
     // 2c
     {from:'y_2c', to:'rt_2c'},
     {from:'rt_2c', to:'proof_prop',  label:'results / dodges'},
@@ -396,7 +405,8 @@ function seed(){
     // 2f
     {from:'y_2f', to:'rt_2f'},
     {from:'rt_2f', to:'y_2f_both', label:"I'd recommend it"},
-    {from:'rt_2f', to:'y_2c',      label:'doubts myself'},
+    {from:'rt_2f', to:'y_2f_2c',   label:'doubts myself'},
+    {from:'y_2f_2c', to:'proof_prop'},
     {from:'y_2f_both', to:'rt_2f_yes'},
     {from:'rt_2f_yes', to:'y_book', label:'yes'},
   ];
