@@ -179,6 +179,47 @@ async function enrichRealName(c) {
   } catch (e) { c.realNameV2 = true; }
 }
 
+// ---------- the 7-Labs DM-setting playbook (the AI's reference for the ideal convo arc) ----------
+const MAIN_SCRIPT = `FACELESS FUNNEL CHALLENGE — DM-SETTING SCRIPT (7 LABS, "Paul")
+GOLDEN RULE: when there's a LIVE conversation, work the live chat to book them — be human, show passion.
+
+ARC: Greeting VN → STEP 1 (tried online before / first look?) → bridge → "What is FFC" VN → "watched the first video?" → STEP 2 "why now?" → STEP 3 (acknowledge their why + dig: situation + invested-before/what-was-missing) → STEP 4 THE GATE (every lead, before ANY link) → branch 🟢/🟡/🔴.
+
+STEP 1: "Quick one before we dive in, have you tried building something online before, or is this your first real look into it?"
+ - Beginner → "no worries then, you're exactly who this was built for. Most of our best students started from zero." then the What-is-FFC VN.
+ - Tried before → "nice, so you already know the game. The part most people get stuck on is the offer, not the tech." then the VN.
+ → then: "have you had a chance to watch the first video of the training yet?"
+
+STEP 2 "WHY NOW": "why now? what changed recently that made you go 'ok, I need to figure this out' this month rather than next year?"
+ - Not watched the video → "no worries! it's only 10 min and everything after makes way more sense once you've seen it 🙌 while you get to it, why now?"
+ ACKNOWLEDGE their answer in THEIR words, one line. Never the generic "wake up whenever you want" line.
+
+STEP 3: respond to their WHY NOW (acknowledge + next question in ONE message), goal = learn (1) their situation (working / own business / in between) and (2) have they invested in help before + what was missing.
+ - "have you tried anything before to get out of it, a course/coaching, or is this your first real go?"
+ - If burned/scammed before → "what was missing last time - the info, or the support after you invested?"
+ - support/doing-it-alone was missing → "so it wasn't the info, it was doing it alone — that's exactly who this works best for."
+
+STEP 4 — THE GATE (EVERY LEAD, BEFORE ANY LINK): "If we walked you through how our team can shortcut all this for you, and it felt like the right fit, are you in a position to invest in that right now, or would it be more of a future thing?"
+
+🟢 GREEN (yes / would find a way / open): goal+proof → "let's get you moving 👌 you said you want [their thing], let me show you what that looks like" [Proof] → plan+ask: "we build your site, load proven products, set up your first ad so you're selling in days not months. Our Head Coach can walk you through it on a quick call — want me to grab you a spot this week?" → on YES → send Booking Link.
+🟡 YELLOW (future / not sure / just curious → NO link yet; never say "no pressure"): ISOLATE "is it more the investment side, or more that you're not sure this'd actually work for you?" → answer ONCE by type (price-with-income: "if the investment wasn't a factor, would you actually want to do this?"; price-no-income: value first, max 3 msgs, never a number; fit/doubt: "what would make this a yes for you?"; time: "will next month really be less busy? we build it so it doesn't eat your week"; partner: "if you asked them today would you say it's the right move?") → PROOF + proposal → "want me to grab you a spot this week?" → YES → Booking Link.
+🔴 RED (hard no money for now → no call/proof/link): ONE message — "no worries 🙏 then the right move right now is the challenge, not Elite. You've got the training + products, get first sales on your own, I'm here for questions. When you're in a better spot, reach back and we'll set up the call. I'll check in on [date] 🙌"`;
+
+// strip internal/system lines (automation narration, placeholders) so the AI reasons on the REAL convo only
+function cleanMsgs(c) {
+  return (c.messages || []).filter(m => {
+    const t = (m.text || '').trim();
+    if (!t) return false;
+    if (/^⚙️ fired automation:/.test(t)) return false;        // internal: "fired automation: X"
+    if (/^📷 Sent an image/.test(t)) return false;            // media placeholder noise
+    if (m.mirror && /(bot sent setup message|path - bot sent|online soon$|training video reminder)/i.test(t)) return false; // welcome-flow narration
+    return true;
+  });
+}
+function transcriptOf(c) {
+  return cleanMsgs(c).map(m => `${m.dir === 'in' ? 'Lead' : 'Setter'}: ${m.text}`).join('\n');
+}
+
 // ---------- brain (suggestion) — real Claude if key, else stub ----------
 async function suggest(c) {
   const lastIn = [...c.messages].reverse().find(m => m.dir === 'in');
@@ -188,11 +229,15 @@ async function suggest(c) {
   try {
     const Anthropic = require('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
-    const transcript = c.messages.map(m => `${m.dir === 'in' ? 'Lead' : 'Setter'}: ${m.text}`).join('\n');
+    const transcript = transcriptOf(c);
     const msg = await client.messages.create({
       model: 'claude-sonnet-5', max_tokens: 400,
-      system: 'You are an FFC (Faceless Funnel Challenge) setter. Warm, concise, never pushy. Goal: qualify then book a call for the $5k Elite. Reply with ONLY the message to send.',
-      messages: [{ role: 'user', content: `Conversation so far:\n${transcript}\n\nWrite the next reply.` }],
+      system: `You are Paul, an FFC (Faceless Funnel Challenge) DM setter. Warm, human, concise, never pushy. Goal: follow the script below to qualify the lead and book a call for the $5k Elite.
+Read the transcript, work out WHERE in the script the lead is, and write the next scripted move — adapted to their exact words, not copy-paste. One message only. Acknowledge what they actually said in one line before the next question. Never skip the Gate before sending any link. Output ONLY the message to send, nothing else.
+
+SCRIPT:
+${MAIN_SCRIPT}`,
+      messages: [{ role: 'user', content: `Conversation so far:\n${transcript}\n\nWrite the next reply, following the script for where this lead is.` }],
     });
     return { text: msg.content[0].text.trim(), confidence: 0.8 };
   } catch (e) {
@@ -225,17 +270,21 @@ async function generateFuSuggestion(c, step) {
   try {
     const Anthropic = require('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
-    const transcript = c.messages.map(m => `${m.dir === 'in' ? 'Lead' : 'Setter'}: ${m.text}`).join('\n');
+    const transcript = transcriptOf(c);
     const tone = step <= 2 ? 'gentle' : step <= 4 ? 'a bit more direct' : 'a graceful break-up (give them an easy out)';
     const msg = await client.messages.create({
       model: 'claude-sonnet-5', max_tokens: 200,
       system: `You are Paul, an FFC (Faceless Funnel Challenge) DM setter. A lead has gone quiet after we last messaged them — write the NEXT follow-up nudge. This is follow-up #${step}, so tone = ${tone}.
+Use the SCRIPT to understand where in the flow the conversation actually is, then use the FU BANK to pick the right nudge for that stage.
 Rules:
 - Read the transcript: nudge whatever was genuinely the LAST thing we said that they didn't reply to. Never reference an older topic that's since moved on.
-- Prefer a line from the FU bank below that fits. If the convo went off-script and nothing fits, write a short custom nudge in the same warm human style.
+- Prefer a line from the FU bank that fits the current stage. If the convo went off-script and nothing fits, write a short custom nudge in the same warm human style.
 - NEVER reuse a line already sent in the transcript — especially the once-ever pool lines (the "1 to 10", "where are you at", and the "one last message" close).
 - Fill tokens ([name], [their reason], [their goal]) from the transcript; if unknown, drop them naturally.
 - Output ONLY the message text to send. One short message. No preamble, no quotes.
+
+SCRIPT (for stage context):
+${MAIN_SCRIPT}
 
 FU BANK:
 ${FU_BANK}`,
