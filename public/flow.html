@@ -44,6 +44,9 @@
   .stepmsg{background:#F7F9FB;border:1px solid #EAEEF2;border-radius:8px;padding:7px 9px;font-size:13px;
     line-height:1.38;margin-bottom:7px;}
   .stepflow:last-child,.stepmsg:last-child{margin-bottom:0;}
+  /* route pill — a junction, not a message bubble */
+  .node.route{width:230px;background:#EDF1F6;border:1px solid #CFD8E2;border-radius:24px;box-shadow:0 1px 3px rgba(20,40,70,.06);}
+  .node.route .routelabel{padding:11px 18px;text-align:center;font-size:13px;font-weight:700;color:#5A6B7D;}
   /* connector handles */
   .port{position:absolute;width:15px;height:15px;border-radius:50%;background:#fff;border:2px solid var(--arrow);
     left:50%;transform:translateX(-50%);cursor:crosshair;transition:border-color .12s,background .12s;}
@@ -155,8 +158,7 @@ function seed(){
   // All six Step-2 bubbles end on the SAME "why now?" question → they converge into ONE hub,
   // which then fans out into the 4 Step-3 why-now answers. (Michael's structure.)
   nodes.push(
-    {id:'hub3', x:1540, y:1480, title:'STEP 3 · They answer "why now?"', steps:[
-      {t:'msg', text:'↳ route by what they say (acknowledge in their words, one line, then the next question)'}]},
+    {id:'hub3', x:1540, y:1500, kind:'route', title:'They answer "why now?"'},
     {id:'s3_job', x:980,  y:1840, title:'STEP 3 · Why now: job stress / hate 9–5', steps:[
       {t:'msg', text:"Yeah, trading hours for money gets old fast, makes sense you're looking. Have you tried anything before to get out of it, like a course or coaching, or is this your first real go?"}]},
     {id:'s3_money', x:1360, y:1840, title:'STEP 3 · Why now: money tight / debt', steps:[
@@ -197,15 +199,23 @@ function renderNodes(){
     const el=document.createElement('div');
     el.className='node'; el.dataset.id=n.id;
     el.style.left=n.x+'px'; el.style.top=n.y+'px';
-    const steps=n.steps||[{t:'msg',text:n.text||''}];
-    const body=steps.map(s=> s.t==='flow'
-      ? `<div class="stepflow">⚡ ${esc(s.name)}</div>`
-      : `<div class="stepmsg">${esc(s.text)}</div>`).join('');
-    el.innerHTML=`
-      <div class="port in" data-port="in"></div>
-      <div class="head"><span class="dot"></span><span class="title">${esc(n.title)}</span></div>
-      <div class="body">${body}</div>
-      <div class="port out" data-port="out"></div>`;
+    if(n.kind==='route'){
+      el.className='node route'+(n.id===CUR?'':'');
+      el.innerHTML=`
+        <div class="port in" data-port="in"></div>
+        <div class="routelabel">${esc(n.title)}</div>
+        <div class="port out" data-port="out"></div>`;
+    } else {
+      const steps=n.steps||[{t:'msg',text:n.text||''}];
+      const body=steps.map(s=> s.t==='flow'
+        ? `<div class="stepflow">⚡ ${esc(s.name)}</div>`
+        : `<div class="stepmsg">${esc(s.text)}</div>`).join('');
+      el.innerHTML=`
+        <div class="port in" data-port="in"></div>
+        <div class="head"><span class="dot"></span><span class="title">${esc(n.title)}</span></div>
+        <div class="body">${body}</div>
+        <div class="port out" data-port="out"></div>`;
+    }
     canvas.appendChild(el);
   });
   wireInteractions();
