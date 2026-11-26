@@ -167,6 +167,10 @@ function seed(){
       {t:'msg', text:"Love that! so it's about buying your time back, not just the money. What's the setup right now? Working full-time, running something of your own, or in between?"}]},
     {id:'s3_mon', x:2120, y:1840, title:'STEP 3 · Why now: just money / 2nd income', steps:[
       {t:'msg', text:"Fair! And what would actually change for you if this worked? Not the money itself, what it's for?"}]},
+    {id:'s3_burned', x:200, y:1840, title:'STEP 3 · Burned / scammed before', steps:[
+      {t:'msg', text:'Ah, sorry to hear that, way more common than people admit. What was missing last time - the info, or the support after you invested?'}]},
+    {id:'s3_tried', x:600, y:1840, title:'STEP 3 · Tried stuff before / nothing worked', steps:[
+      {t:'msg', text:"So you've already put in effort and it didn't pay off, that's actually the exact person this works best for. What was missing last time - the info, or the support after you invested?"}]},
   );
   edges=[
     {from:'n1', to:'n2', label:'Beginner / first look'},
@@ -185,6 +189,8 @@ function seed(){
     {from:'hub3', to:'s3_money', label:'Money tight'},
     {from:'hub3', to:'s3_fam',   label:'Family / freedom'},
     {from:'hub3', to:'s3_mon',   label:'Just money'},
+    {from:'hub3', to:'s3_burned', label:'Burned / scammed'},
+    {from:'hub3', to:'s3_tried',  label:'Tried, nothing worked'},
     // "just money" surfaces their real why → route it like a why-now (loops back to the hub)
     {from:'s3_mon', to:'hub3', loop:true, label:'↩ loops back — re-route by their real why'},
   ];
