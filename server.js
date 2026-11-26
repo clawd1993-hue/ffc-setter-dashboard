@@ -477,14 +477,15 @@ function fuStepForSilence(hours) {
 function statusOf(c) {
   const last = c.messages && c.messages.at(-1);
   if (!last) return 'review';
-  if (last.dir === 'out') {                         // we spoke last
+  // Only a REAL setter reply (outbound, NOT a bot/automation mirror) counts as "we replied".
+  // A fired automation / welcome mirror does NOT — a setter still needs to pick the lead up.
+  if (last.dir === 'out' && !last.mirror) {         // a human setter spoke last
     const step = fuStepForSilence((Date.now() - last.t) / 3600000);
     return step ? ('fu' + step) : 'replied';        // recent = replied; aged = fu1..fu5
   }
-  // last is inbound. Normally = review, UNLESS a setter manually marked it replied
-  // AFTER that inbound (used when ManyChat isn't synced). Auto-reverts: any NEW inbound
-  // (t > manualRepliedAt) wins back "review".
-  if (c.manualRepliedAt && last.t <= c.manualRepliedAt) return 'replied';
+  // last was the lead (inbound) OR only a bot automation (mirror) → a setter needs to act = review.
+  // Exception: a setter manually marked replied AFTER the last inbound (auto-reverts on next inbound).
+  if (last.dir === 'in' && c.manualRepliedAt && last.t <= c.manualRepliedAt) return 'replied';
   return 'review';
 }
 app.get('/api/conversations', (_req, res) =>
