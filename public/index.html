@@ -263,6 +263,15 @@ async function loadList(){
 }
 function filter(v){FILTER=v;loadList();}
 
+// change-signature for the open thread: messages AND the current suggestion/FU draft, so a
+// suggestion that lands a beat after the message still triggers a repaint (no manual refresh).
+function sigOf(c){
+  const msgs=c.messages||[];
+  const base=msgs.reduce((a,m)=>a+(m.text||'').length+(m.transcript||'').length,0)+'/'+msgs.length;
+  const sug=c.suggestion?JSON.stringify(c.suggestion.steps||c.suggestion.text||'').length:0;
+  const fu=c.fuSuggestion?((c.fuSuggestion.text||'').length+(c.fuSuggestion.pending?'P':'')):0;
+  return base+'/'+sug+'/'+fu;
+}
 async function open_(id,keepDraft){
   CUR=id;
   // preserve whatever the human is typing across the 5s auto-refresh
@@ -273,7 +282,7 @@ async function open_(id,keepDraft){
   const c=await (await fetch('/api/conversation/'+id)).json();
   // auto-refresh: if no NEW message arrived, don't rebuild the pane at all
   // (prevents scroll jumps, closing the flow menu, and wiping a draft)
-  const msgSig=(c.messages||[]).reduce((a,m)=>a+(m.text||'').length+(m.transcript||'').length,0)+'/'+(c.messages||[]).length;
+  const msgSig=sigOf(c);
   if(keepDraft&&CUR===id&&window.__msgSig===msgSig){loadList();return;}
   const sug=c.suggestion;
   document.getElementById('thread').innerHTML=`
@@ -347,7 +356,7 @@ async function open_(id,keepDraft){
       </div>
     </div>`;
   const m=document.getElementById('msgs'); if(m)m.scrollTop=m.scrollHeight;
-  window.__msgSig=(c.messages||[]).reduce((a,m)=>a+(m.text||'').length+(m.transcript||'').length,0)+'/'+(c.messages||[]).length;
+  window.__msgSig=sigOf(c);
   // restore the draft the human was typing before the refresh
   const r=document.getElementById('reply');
   if(r&&draft){r.value=draft; if(hadFocus){r.focus(); try{r.setSelectionRange(caret,caret);}catch(e){}}}
@@ -553,7 +562,7 @@ document.addEventListener('click',e=>{
   ['flowmenu','cannedmenu','emojimenu'].forEach(id=>{const m=document.getElementById(id);if(m)m.style.display='none';});
 });
 renderBookmarks();
-loadList(); setInterval(()=>{loadList(); if(CUR)open_(CUR,true);},5000);
+loadList(); setInterval(()=>{loadList(); if(CUR)open_(CUR,true);},3000);
 </script>
 </body>
 </html>
