@@ -229,18 +229,30 @@ app.post('/manychat/inbound', async (req, res) => {
     c = { id: 'mc-' + sid, subscriber_id: sid, name: b.name || 'Lead ' + sid.slice(-4), handle: b.user_name || '', channel: 'Telegram', avatarColor: '#0084FF', mode: 'approve', tag: 'review', updated: Date.now(), lead: {}, aiRead: [], nextStep: '', messages: [], suggestion: null };
     db.conversations.unshift(c);
   }
-  // try to grab a media/attachment URL if ManyChat ever sends one (not in default payload yet)
-  const mediaUrl = pickv('attachment_url', 'last_input_attachment', 'image_url', 'media_url', 'file_url', 'last_attachment_url');
   if (text) {
     c.messages.push({ dir: 'in', text, t: Date.now() });
-  } else if (mediaUrl) {
-    c.messages.push({ dir: 'in', text: '', mediaUrl, t: Date.now() });        // real image → render inline
+    // BRIDGE: match this text to a recent proxy text to link tgId <-> this convo
+    if (!c.tgId) {
+      const n = norm(text);
+      if (n && !COMMON.has(n) && n.length >= 3) {
+        const hit = TG_TEXTS.find(e => e.norm === n && Date.now() - e.t < BRIDGE_WINDOW);
+        if (hit && !convoByTg(hit.tgId)) linkTg(hit.tgId, c);
+      }
+    }
   } else {
-    // non-text user input (image/voice/sticker) with no URL — at least register it so it's not invisible
-    c.messages.push({ dir: 'in', text: '📷 Sent an image / media — not viewable here yet (open ManyChat to see it)', t: Date.now(), media: true });
+    // media (null text): the proxy delivers the REAL file — don't log a placeholder.
+    // record a media event so an unlinked proxy media can timing-match to this convo,
+    // and claim any already-held media for a tgId within the window.
+    MC_MEDIA.unshift({ convoId: c.id, t: Date.now(), claimed: !!c.tgId });
+    if (MC_MEDIA.length > 60) MC_MEDIA.pop();
+    if (c.tgId && HELD_MEDIA[c.tgId]) { const held = HELD_MEDIA[c.tgId]; delete HELD_MEDIA[c.tgId]; held.forEach(m => pushMedia(c, m)); }
+    else if (!c.tgId) {
+      const tgId = Object.keys(HELD_MEDIA).find(k => (HELD_MEDIA[k] || []).some(m => Date.now() - m.t < BRIDGE_WINDOW));
+      if (tgId) linkTg(tgId, c);
+    }
   }
   enrichEmail(c).catch(() => {}); // fire-and-forget: grab saved email on first contact
-  const s = await suggest(c);
+  const s = text ? await suggest(c) : c.suggestion; // only re-suggest on real text
   c.suggestion = s; c.tag = c.mode === 'auto' ? 'auto' : 'review'; touch(c);
 
   if (c.mode === 'auto' && AUTO_SEND_ENABLED) {
@@ -360,21 +372,61 @@ async function transcribeVoice(c, msg) {
   } catch (e) { console.error('[whisper] failed:', e.message); }
 }
 
-app.post('/ingest/tg-media', async (req, res) => {
+// ====== BRIDGE: link a lead's Telegram id <-> their ManyChat convo ======
+// ManyChat hides the Telegram id, so we link the PERSON once (by matching a text both
+// sides saw, or by the timing of a media event), cache it on the convo (c.tgId), then
+// all their media flows into that one thread. Media before any link is held + flushed.
+const BRIDGE_WINDOW = 25000;                 // ms: how close the two sides must be to match
+const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+const COMMON = new Set(['hi','hey','hello','yo','ok','okay','yes','no','yep','nope','sure','k','hiya','thanks','ty','👍','🙏']);
+const TG_TEXTS = [];        // recent proxy texts: {tgId, name, username, norm, t}
+const MC_MEDIA = [];        // recent ManyChat null-text (media) events: {convoId, t, claimed}
+const HELD_MEDIA = {};      // tgId -> [messages] waiting for a link
+const MEDIA_LABEL = { image: '📷 Photo', voice: '🎙️ Voice note', audio: '🎵 Audio', video: '🎬 Video', document: '📄 File' };
+const convoByTg = tgId => db.conversations.find(c => c.tgId === tgId);
+
+function pushMedia(c, m) {
+  c.messages.push(m); touch(c);
+  if (m.mediaType === 'voice' || m.mediaType === 'audio') transcribeVoice(c, m);
+}
+function linkTg(tgId, c) {         // bind a tgId to a convo + flush any held media
+  if (!c || c.tgId === tgId) return;
+  c.tgId = tgId;
+  const held = HELD_MEDIA[tgId] || [];
+  delete HELD_MEDIA[tgId];
+  held.forEach(m => pushMedia(c, m));
+  touch(c);
+}
+
+// unified feed from the ffc-tg-proxy: every Telegram message (text for linking, media to show)
+app.post('/ingest/tg', async (req, res) => {
   const b = req.body || {};
-  const sid = String(b.subscriber_id || '').trim();
-  if (!sid || !b.file_id) return res.status(400).json({ error: 'need subscriber_id + file_id' });
-  let c = db.conversations.find(x => x.subscriber_id === sid);
-  if (!c) {
-    c = { id: 'mc-' + sid, subscriber_id: sid, name: b.name || (b.username ? '@' + b.username : 'Lead ' + sid.slice(-4)), handle: b.username ? '@' + b.username : '', channel: 'Telegram', avatarColor: '#0084FF', mode: 'approve', tag: 'review', updated: Date.now(), lead: {}, aiRead: [], nextStep: '', messages: [], suggestion: null };
-    db.conversations.unshift(c);
+  const tgId = String(b.subscriber_id || b.tgId || '').trim();
+  if (!tgId) return res.status(400).json({ error: 'need tgId' });
+
+  // --- MEDIA ---
+  if (b.file_id) {
+    const type = b.type || 'document';
+    const label = type === 'document' ? ('📄 ' + (b.file_name || 'File')) : (MEDIA_LABEL[type] || '📎 Attachment');
+    const msg = { dir: 'in', t: b.t || Date.now(), mediaType: type, fileId: b.file_id, text: b.caption || label, mirror: true };
+    const linked = convoByTg(tgId);
+    if (linked) { pushMedia(linked, msg); return res.json({ ok: true, id: linked.id, linked: true }); }
+    // not linked yet: try to timing-match a very recent ManyChat media event, else hold
+    const slot = MC_MEDIA.find(s => !s.claimed && Date.now() - s.t < BRIDGE_WINDOW);
+    if (slot) { slot.claimed = true; const c = db.conversations.find(x => x.id === slot.convoId); if (c) { linkTg(tgId, c); pushMedia(c, msg); return res.json({ ok: true, id: c.id, linkedByTiming: true }); } }
+    (HELD_MEDIA[tgId] = HELD_MEDIA[tgId] || []).push(msg);
+    return res.json({ ok: true, held: true });
   }
-  const type = b.type || 'document';
-  const labels = { image: '📷 Photo', voice: '🎙️ Voice note', audio: '🎵 Audio', video: '🎬 Video', document: '📄 ' + (b.file_name || 'File') };
-  const msg = { dir: 'in', t: b.t || Date.now(), mediaType: type, fileId: b.file_id, text: b.caption || labels[type] || '📎 Attachment', mirror: true };
-  c.messages.push(msg); touch(c);
-  res.json({ ok: true, id: c.id });
-  if (type === 'voice' || type === 'audio') transcribeVoice(c, msg); // async, updates in place
+
+  // --- TEXT (used only to link; the message itself is logged via ManyChat) ---
+  const n = norm(b.text);
+  if (n && !COMMON.has(n) && n.length >= 3) {
+    TG_TEXTS.unshift({ tgId, name: b.name || '', username: b.username || '', norm: n, t: Date.now() });
+    if (TG_TEXTS.length > 80) TG_TEXTS.pop();
+    const linked = convoByTg(tgId);
+    if (linked) linked.updated = Date.now();
+  }
+  res.json({ ok: true });
 });
 
 // serve a Telegram file through us so the bot token never hits the browser
