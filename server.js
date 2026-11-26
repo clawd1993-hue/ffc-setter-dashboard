@@ -135,6 +135,33 @@ const sendText = (subscriber_id, text) =>
   mc('/fb/sending/sendContent', { subscriber_id, data: { version: 'v2', content: { type: 'telegram', messages: [{ type: 'text', text }] } } });
 // fire a SAVED ManyChat automation (booking/qualify/tag sequence) — THE hand-off
 const sendFlow = (subscriber_id, flow_ns) => mc('/fb/sending/sendFlow', { subscriber_id, flow_ns });
+
+// ---- automation name <-> flow_ns cache (so the AI can reference flows by name) ----
+// Only these are setter-sendable in the script; hide system/default/untitled flows from the brain.
+const SENDABLE_FLOWS = ['Welcome VN', 'What is FFC', 'FFC Access Link', 'Proof', 'Booking Link'];
+let FLOW_MAP = {};        // lowercased name -> flow_ns
+let FLOW_MAP_AT = 0;
+async function refreshFlowMap() {
+  if (!MANYCHAT_TOKEN) return FLOW_MAP;
+  if (Date.now() - FLOW_MAP_AT < 10 * 60000 && Object.keys(FLOW_MAP).length) return FLOW_MAP; // 10-min cache
+  try {
+    const r = await fetch(MC_BASE + '/fb/page/getFlows', { headers: { Authorization: `Bearer ${MANYCHAT_TOKEN}` } });
+    const d = await r.json();
+    const flows = (d && d.data && d.data.flows) || [];
+    const m = {};
+    for (const f of flows) { if (f.name && f.ns) m[f.name.toLowerCase().trim()] = f.ns; }
+    FLOW_MAP = m; FLOW_MAP_AT = Date.now();
+  } catch (e) { console.error('[flows] refresh failed:', e.message); }
+  return FLOW_MAP;
+}
+// resolve an automation name the AI used -> flow_ns (exact, then contains match)
+function flowNsByName(name) {
+  const n = (name || '').toLowerCase().trim();
+  if (!n) return null;
+  if (FLOW_MAP[n]) return FLOW_MAP[n];
+  const key = Object.keys(FLOW_MAP).find(k => k.includes(n) || n.includes(k));
+  return key ? FLOW_MAP[key] : null;
+}
 // GET helper (getInfo etc.)
 async function mcGet(endpoint) {
   if (!MANYCHAT_TOKEN) return null;
@@ -229,21 +256,48 @@ async function suggest(c) {
   try {
     const Anthropic = require('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    await refreshFlowMap();
     const transcript = transcriptOf(c);
     const msg = await client.messages.create({
-      model: 'claude-sonnet-5', max_tokens: 400,
+      model: 'claude-sonnet-5', max_tokens: 500,
       system: `You are Paul, an FFC (Faceless Funnel Challenge) DM setter. Warm, human, concise, never pushy. Goal: follow the script below to qualify the lead and book a call for the $5k Elite.
-Read the transcript, work out WHERE in the script the lead is, and write the next scripted move — adapted to their exact words, not copy-paste. One message only. Acknowledge what they actually said in one line before the next question. Never skip the Gate before sending any link. Output ONLY the message to send, nothing else.
+Read the transcript, work out WHERE in the script the lead is, and produce the next scripted move — adapted to their exact words, not copy-paste. Acknowledge what they actually said in one line before the next question. Never skip the Gate before sending any link.
+
+A single move can be MULTIPLE steps in order — e.g. fire the "Welcome VN" automation THEN send the Step 1 message. Available automations you may fire (use the exact name): ${SENDABLE_FLOWS.join(', ')}.
+
+OUTPUT FORMAT — reply with ONLY a JSON array of steps, in order, no prose around it:
+[{"fire":"Welcome VN"}, {"say":"Hey, it's Paul here! ..."}]
+Use {"fire":"<automation name>"} to fire an automation, {"say":"<message>"} to send a text. Most turns are just one {"say":...}. Fire an automation only where the script calls for it (Welcome VN at the very start, What is FFC after Step 1, FFC Access Link if they can't find it, Proof + Booking Link in the green/yellow branches). Output valid JSON only.
 
 SCRIPT:
 ${MAIN_SCRIPT}`,
-      messages: [{ role: 'user', content: `Conversation so far:\n${transcript}\n\nWrite the next reply, following the script for where this lead is.` }],
+      messages: [{ role: 'user', content: `Conversation so far:\n${transcript}\n\nGive the next move as a JSON array of steps, following the script for where this lead is.` }],
     });
     const out = (msg.content.find(b => b.type === 'text') || {}).text || '';
-    return { text: out.trim(), confidence: 0.8 };
+    const steps = parseSteps(out);
+    return { steps, text: steps.filter(s => s.type === 'message').map(s => s.text).join('\n'), confidence: 0.8 };
   } catch (e) {
     return { text: `(brain error: ${e.message})`, confidence: 0, stub: true };
   }
+}
+
+// turn the AI's JSON step array into normalized steps; fall back to one plain message on any parse miss
+function parseSteps(out) {
+  let raw = (out || '').trim();
+  const a = raw.indexOf('['), b = raw.lastIndexOf(']');
+  if (a !== -1 && b > a) raw = raw.slice(a, b + 1);
+  try {
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) {
+      const steps = [];
+      for (const s of arr) {
+        if (s && typeof s.say === 'string' && s.say.trim()) steps.push({ type: 'message', text: s.say.trim() });
+        else if (s && typeof s.fire === 'string' && s.fire.trim()) steps.push({ type: 'flow', name: s.fire.trim(), flow_ns: flowNsByName(s.fire) });
+      }
+      if (steps.length) return steps;
+    }
+  } catch {}
+  return [{ type: 'message', text: (out || '').trim() }]; // not JSON → treat whole thing as one message
 }
 
 // ---------- Follow-Up suggestion generator (Phase 1) ----------
@@ -460,6 +514,32 @@ app.post('/api/send', async (req, res) => {
   const r = await sendText(c.subscriber_id, out);
   c.messages.push({ dir: 'out', text: out, t: Date.now() }); c.suggestion = null; c.tag = 'replied'; touch(c);
   res.json({ ok: true, manychat: r });
+});
+
+// 3b) setter approves a MULTI-STEP suggestion (fire automation(s) + message(s)) — run in order
+app.post('/api/send-sequence', async (req, res) => {
+  const { id, steps } = req.body; const c = convo(id); if (!c) return res.status(404).json({ error: 'not found' });
+  const seq = Array.isArray(steps) && steps.length ? steps : (c.suggestion && c.suggestion.steps) || [];
+  if (!seq.length) return res.status(400).json({ error: 'no steps' });
+  if (!SEND_ENABLED) { return res.json({ ok: false, blocked: true, note: 'Sending is OFF (SEND_ENABLED not set). Nothing was sent to the lead.' }); }
+  const done = [];
+  for (const s of seq) {
+    if (s.type === 'flow' || s.fire) {
+      const name = s.name || s.fire;
+      const ns = s.flow_ns || flowNsByName(name);
+      if (!ns) { done.push({ skipped: name, reason: 'no matching automation' }); continue; }
+      await sendFlow(c.subscriber_id, ns);
+      c.messages.push({ dir: 'out', text: `⚙️ fired automation: ${name}`, t: Date.now() });
+      done.push({ fired: name });
+    } else {
+      const t = (s.text || s.say || '').trim(); if (!t) continue;
+      await sendText(c.subscriber_id, t);
+      c.messages.push({ dir: 'out', text: t, t: Date.now() });
+      done.push({ sent: t });
+    }
+  }
+  c.suggestion = null; c.tag = 'replied'; touch(c);
+  res.json({ ok: true, steps: done });
 });
 
 // 4) hand off to a SAVED ManyChat flow (booking/qualify/etc) — sendFlow

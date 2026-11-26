@@ -100,6 +100,9 @@
   .ai-suggest{background:var(--blue-soft);border:1px solid #CCE4FF;border-radius:12px;padding:12px 14px;margin-bottom:10px;}
   .ai-suggest .label{font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
   .ai-suggest .txt{font-size:14px;line-height:1.45;}
+  .step-flow{background:#EEF4FF;border:1px dashed #9DBDF0;border-radius:8px;padding:6px 10px;margin-bottom:6px;font-size:13px;color:#2C5FB3;}
+  .step-flow.missing{background:#FFF3F2;border-color:#F3C2BC;color:#C0392B;}
+  .step-msg{background:#fff;border:1px solid #E4ECF7;border-radius:8px;padding:7px 10px;margin-bottom:6px;}
   .fu-suggest{background:#FFF4E5;border:1px solid #FFD591;border-radius:12px;padding:12px 14px;margin-bottom:10px;}
   .fu-suggest .label{font-size:11px;color:#C77700;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
   .fu-suggest .txt{font-size:14px;line-height:1.45;}
@@ -317,13 +320,19 @@ async function open_(id,keepDraft){
             <button class="btn ghost" onclick="document.getElementById('reply').value=document.getElementById('futxt').textContent;document.getElementById('reply').focus()">Edit</button>
           </div>`}
       </div>`:''}
-      ${sug?`<div class="ai-suggest">
-        <div class="label">🤖 AI suggested reply · confidence ${Math.round((sug.confidence||0)*100)}%</div>
-        <div class="txt" id="sugtxt">${esc(sug.text)}</div>
+      ${sug?(()=>{
+        const steps=(sug.steps&&sug.steps.length)?sug.steps:[{type:'message',text:sug.text||''}];
+        const multi=steps.length>1||steps.some(s=>s.type==='flow');
+        const body=steps.map(s=>s.type==='flow'
+          ?`<div class="step-flow${s.flow_ns?'':' missing'}">⚡ Fire automation: <b>${esc(s.name)}</b>${s.flow_ns?'':' ⚠️ not found'}</div>`
+          :`<div class="step-msg">${esc(s.text)}</div>`).join('');
+        return `<div class="ai-suggest">
+        <div class="label">🤖 AI suggested reply${multi?` · ${steps.length} steps`:''} · confidence ${Math.round((sug.confidence||0)*100)}%</div>
+        <div class="txt" id="sugtxt">${body}</div>
         <div class="ai-actions">
-          <button class="btn send" onclick="send('${c.id}',document.getElementById('sugtxt').textContent)">Send ✓</button>
-          <button class="btn ghost" onclick="document.getElementById('reply').value=document.getElementById('sugtxt').textContent;document.getElementById('reply').focus()">Edit</button>
-        </div></div>`:''}
+          <button class="btn send" onclick="sendSeq('${c.id}')">Send ${multi?'all ':''}✓</button>
+          <button class="btn ghost" onclick="document.getElementById('reply').value=${JSON.stringify(steps.filter(s=>s.type!=='flow').map(s=>s.text).join('\n'))};document.getElementById('reply').focus()">Edit</button>
+        </div></div>`;})():''}
       <div id="flowmenu" class="flowmenu"></div>
       <div id="cannedmenu" class="flowmenu"></div>
       <div id="emojimenu" class="emojimenu"></div>
@@ -484,6 +493,11 @@ async function delCanned(id){
 }
 async function send(id,text){ if(!text||!text.trim())return;
   await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,text:text.trim()})});
+  open_(id);
+}
+// approve a multi-step AI suggestion (fires automations + sends messages in order)
+async function sendSeq(id){
+  await fetch('/api/send-sequence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
   open_(id);
 }
 async function setMode(id,mode){
