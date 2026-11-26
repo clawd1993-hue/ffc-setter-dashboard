@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Main Script Flow</title>
+<style>
+  :root{
+    --bg:#F4F6F8; --line:#E3E8EF; --ink:#1C2B3A; --muted:#6B7A8D;
+    --blue:#0A84FF; --arrow:#9AA7B8; --card:#fff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);}
+  /* top bar */
+  .topbar{position:fixed;top:0;left:0;right:0;height:52px;background:#fff;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:14px;padding:0 18px;z-index:20;}
+  .topbar h1{font-size:15px;font-weight:700;margin:0;}
+  .topbar .sub{font-size:12px;color:var(--muted);}
+  .topbar .spacer{flex:1;}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 13px;font-size:13px;font-weight:600;
+    cursor:pointer;color:var(--ink);}
+  .btn:hover{background:#F7F9FB;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .btn.primary:hover{filter:brightness(.95);}
+  /* whiteboard */
+  #board{position:absolute;top:52px;left:0;right:0;bottom:0;overflow:auto;
+    background-color:var(--bg);
+    background-image:radial-gradient(#D5DCE4 1.2px, transparent 1.2px);
+    background-size:22px 22px;}
+  #canvas{position:relative;width:4000px;height:3000px;}
+  svg#wires{position:absolute;top:0;left:0;width:4000px;height:3000px;pointer-events:none;overflow:visible;}
+  svg#wires path{pointer-events:stroke;cursor:pointer;}
+  /* message bubble */
+  .node{position:absolute;width:230px;background:var(--card);border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 2px 6px rgba(20,40,70,.08);user-select:none;cursor:grab;}
+  .node.drag{cursor:grabbing;box-shadow:0 8px 22px rgba(20,40,70,.18);z-index:5;}
+  .node .head{display:flex;align-items:center;gap:7px;padding:9px 12px 7px;border-bottom:1px solid #EEF2F6;}
+  .node .dot{width:9px;height:9px;border-radius:50%;background:var(--blue);flex:0 0 auto;}
+  .node .title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .node .body{padding:11px 12px 13px;font-size:14px;line-height:1.4;color:var(--ink);}
+  /* connector handles */
+  .port{position:absolute;width:15px;height:15px;border-radius:50%;background:#fff;border:2px solid var(--arrow);
+    left:50%;transform:translateX(-50%);cursor:crosshair;transition:border-color .12s,background .12s;}
+  .port:hover{border-color:var(--blue);background:var(--blue);}
+  .port.in{top:-9px;}
+  .port.out{bottom:-9px;}
+  .hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#1C2B3A;color:#fff;
+    font-size:12px;padding:7px 14px;border-radius:20px;opacity:.9;z-index:20;}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>Main Script Flow</h1>
+    <span class="sub">top → bottom · logic tree</span>
+    <div class="spacer"></div>
+    <button class="btn" onclick="resetView()">Reset view</button>
+    <button class="btn primary" onclick="addNode()">+ Add bubble</button>
+  </div>
+
+  <div id="board">
+    <div id="canvas">
+      <svg id="wires">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#9AA7B8"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+  </div>
+  <div class="hint">Drag bubbles to move · drag the bottom dot onto another bubble to connect · click an arrow to delete it</div>
+
+<script>
+const canvas=document.getElementById('canvas');
+const svg=document.getElementById('wires');
+let nodes=[], edges=[], uid=1;
+
+// ---- seed: 3 dummy bubbles chained top → bottom ----
+function seed(){
+  nodes=[
+    {id:'n1', x:1700, y:120, title:'Bubble 1', text:'Dummy message bubble one.'},
+    {id:'n2', x:1700, y:360, title:'Bubble 2', text:'Dummy message bubble two.'},
+    {id:'n3', x:1700, y:600, title:'Bubble 3', text:'Dummy message bubble three.'},
+  ];
+  edges=[{from:'n1',to:'n2'},{from:'n2',to:'n3'}];
+  uid=4;
+  renderNodes(); drawWires();
+}
+
+function nodeById(id){return nodes.find(n=>n.id===id);}
+
+function renderNodes(){
+  // remove existing node divs (keep svg)
+  [...canvas.querySelectorAll('.node')].forEach(e=>e.remove());
+  nodes.forEach(n=>{
+    const el=document.createElement('div');
+    el.className='node'; el.dataset.id=n.id;
+    el.style.left=n.x+'px'; el.style.top=n.y+'px';
+    el.innerHTML=`
+      <div class="port in" data-port="in"></div>
+      <div class="head"><span class="dot"></span><span class="title">${esc(n.title)}</span></div>
+      <div class="body">${esc(n.text)}</div>
+      <div class="port out" data-port="out"></div>`;
+    canvas.appendChild(el);
+  });
+  wireInteractions();
+}
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+// ---- wires (SVG paths) ----
+function centerOut(n){return {x:n.x+115, y:n.y+nodeH(n.id)};}
+function centerIn(n){return {x:n.x+115, y:n.y};}
+function nodeH(id){const el=canvas.querySelector(`.node[data-id="${id}"]`);return el?el.offsetHeight:90;}
+function pathD(a,b){
+  const dy=Math.max(40,Math.abs(b.y-a.y)/2);
+  return `M ${a.x} ${a.y} C ${a.x} ${a.y+dy}, ${b.x} ${b.y-dy}, ${b.x} ${b.y}`;
+}
+function drawWires(){
+  [...svg.querySelectorAll('path.wire')].forEach(e=>e.remove());
+  edges.forEach((e,i)=>{
+    const a=nodeById(e.from), b=nodeById(e.to); if(!a||!b)return;
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('class','wire');
+    p.setAttribute('d',pathD(centerOut(a),centerIn(b)));
+    p.setAttribute('fill','none'); p.setAttribute('stroke','#9AA7B8'); p.setAttribute('stroke-width','2');
+    p.setAttribute('marker-end','url(#arrow)');
+    p.addEventListener('click',()=>{ if(confirm('Delete this arrow?')){edges.splice(i,1);drawWires();} });
+    svg.appendChild(p);
+  });
+}
+
+// ---- interactions: drag nodes + draw connections ----
+let drag=null, link=null, tempPath=null;
+function wireInteractions(){
+  canvas.querySelectorAll('.node').forEach(el=>{
+    const id=el.dataset.id;
+    el.addEventListener('pointerdown',ev=>{
+      if(ev.target.classList.contains('port')) return; // handled below
+      const n=nodeById(id); drag={id,dx:ev.clientX-n.x,dy:ev.clientY-n.y,el};
+      el.classList.add('drag'); el.setPointerCapture(ev.pointerId);
+    });
+    el.querySelector('.port.out').addEventListener('pointerdown',ev=>{
+      ev.stopPropagation();
+      link={from:id};
+      tempPath=document.createElementNS('http://www.w3.org/2000/svg','path');
+      tempPath.setAttribute('fill','none');tempPath.setAttribute('stroke','#0A84FF');
+      tempPath.setAttribute('stroke-width','2');tempPath.setAttribute('stroke-dasharray','5 4');
+      tempPath.setAttribute('marker-end','url(#arrow)');
+      svg.appendChild(tempPath);
+      canvas.setPointerCapture(ev.pointerId);
+    });
+  });
+}
+
+document.addEventListener('pointermove',ev=>{
+  if(drag){
+    const n=nodeById(drag.id);
+    n.x=ev.clientX-drag.dx; n.y=ev.clientY-drag.dy;
+    drag.el.style.left=n.x+'px'; drag.el.style.top=n.y+'px';
+    drawWires();
+  } else if(link){
+    const a=centerOut(nodeById(link.from));
+    const pt=toCanvas(ev.clientX,ev.clientY);
+    tempPath.setAttribute('d',pathD(a,pt));
+  }
+});
+document.addEventListener('pointerup',ev=>{
+  if(drag){ drag.el.classList.remove('drag'); drag=null; }
+  if(link){
+    const over=document.elementFromPoint(ev.clientX,ev.clientY);
+    const tgt=over&&over.closest('.node');
+    if(tgt&&tgt.dataset.id!==link.from){
+      const to=tgt.dataset.id;
+      if(!edges.some(e=>e.from===link.from&&e.to===to)) edges.push({from:link.from,to});
+    }
+    if(tempPath){tempPath.remove();tempPath=null;}
+    link=null; drawWires();
+  }
+});
+// translate a viewport point into canvas coordinates (account for scroll)
+function toCanvas(cx,cy){
+  const board=document.getElementById('board'), r=board.getBoundingClientRect();
+  return {x:cx-r.left+board.scrollLeft, y:cy-r.top+board.scrollTop};
+}
+
+function addNode(){
+  const id='n'+(uid++);
+  const board=document.getElementById('board');
+  nodes.push({id, x:board.scrollLeft+500, y:board.scrollTop+160, title:'Bubble '+(uid-1), text:'New message bubble.'});
+  renderNodes(); drawWires();
+}
+function resetView(){
+  const board=document.getElementById('board');
+  board.scrollTo({left:1550,top:0,behavior:'smooth'});
+}
+
+seed();
+resetView();
+</script>
+</body>
+</html>
