@@ -68,7 +68,7 @@
       </svg>
     </div>
   </div>
-  <div class="hint">Drag bubbles to move · drag the bottom dot onto another bubble to connect · click an arrow to delete it</div>
+  <div class="hint">Drag bubbles to move · drag the bottom dot onto empty space to split a new branch, or onto a bubble to connect · click an arrow to label it (Yes/No) or delete</div>
 
 <script>
 const canvas=document.getElementById('canvas');
@@ -77,12 +77,13 @@ let nodes=[], edges=[], uid=1;
 
 // ---- seed: 3 dummy bubbles chained top → bottom ----
 function seed(){
+  // a TREE that splits: parent on top → two branches below
   nodes=[
-    {id:'n1', x:1700, y:120, title:'Bubble 1', text:'Dummy message bubble one.'},
-    {id:'n2', x:1700, y:360, title:'Bubble 2', text:'Dummy message bubble two.'},
-    {id:'n3', x:1700, y:600, title:'Bubble 3', text:'Dummy message bubble three.'},
+    {id:'n1', x:1700, y:120, title:'Start',   text:'Parent bubble — the question.'},
+    {id:'n2', x:1480, y:420, title:'Branch A', text:'If YES → go here.'},
+    {id:'n3', x:1920, y:420, title:'Branch B', text:'If NO → go here.'},
   ];
-  edges=[{from:'n1',to:'n2'},{from:'n2',to:'n3'}];
+  edges=[{from:'n1',to:'n2',label:'Yes'},{from:'n1',to:'n3',label:'No'}];
   uid=4;
   renderNodes(); drawWires();
 }
@@ -116,17 +117,40 @@ function pathD(a,b){
   return `M ${a.x} ${a.y} C ${a.x} ${a.y+dy}, ${b.x} ${b.y-dy}, ${b.x} ${b.y}`;
 }
 function drawWires(){
-  [...svg.querySelectorAll('path.wire')].forEach(e=>e.remove());
+  [...svg.querySelectorAll('.wire,.wirelabel')].forEach(e=>e.remove());
   edges.forEach((e,i)=>{
     const a=nodeById(e.from), b=nodeById(e.to); if(!a||!b)return;
+    const A=centerOut(a), B=centerIn(b);
     const p=document.createElementNS('http://www.w3.org/2000/svg','path');
     p.setAttribute('class','wire');
-    p.setAttribute('d',pathD(centerOut(a),centerIn(b)));
+    p.setAttribute('d',pathD(A,B));
     p.setAttribute('fill','none'); p.setAttribute('stroke','#9AA7B8'); p.setAttribute('stroke-width','2');
     p.setAttribute('marker-end','url(#arrow)');
-    p.addEventListener('click',()=>{ if(confirm('Delete this arrow?')){edges.splice(i,1);drawWires();} });
+    p.addEventListener('click',()=>editEdge(i));
     svg.appendChild(p);
+    if(e.label){
+      const mx=(A.x+B.x)/2, my=(A.y+B.y)/2;
+      const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','wirelabel');
+      const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      const w=e.label.length*7.5+16;
+      rect.setAttribute('x',mx-w/2);rect.setAttribute('y',my-11);rect.setAttribute('width',w);rect.setAttribute('height',22);
+      rect.setAttribute('rx',11);rect.setAttribute('fill','#fff');rect.setAttribute('stroke','#D5DCE4');
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x',mx);t.setAttribute('y',my+4);t.setAttribute('text-anchor','middle');
+      t.setAttribute('font-size','12');t.setAttribute('font-weight','600');t.setAttribute('fill','#3A4A5C');
+      t.textContent=e.label;
+      g.appendChild(rect);g.appendChild(t);
+      g.style.cursor='pointer'; g.addEventListener('click',()=>editEdge(i));
+      svg.appendChild(g);
+    }
   });
+}
+function editEdge(i){
+  const e=edges[i]; if(!e)return;
+  const v=prompt('Branch label (e.g. Yes / No / Green).\nType "x" to delete this arrow.', e.label||'');
+  if(v===null)return;
+  if(v.trim().toLowerCase()==='x'){edges.splice(i,1);} else {e.label=v.trim();}
+  drawWires();
 }
 
 // ---- interactions: drag nodes + draw connections ----
@@ -170,8 +194,16 @@ document.addEventListener('pointerup',ev=>{
     const over=document.elementFromPoint(ev.clientX,ev.clientY);
     const tgt=over&&over.closest('.node');
     if(tgt&&tgt.dataset.id!==link.from){
+      // dropped on an existing bubble → connect to it
       const to=tgt.dataset.id;
       if(!edges.some(e=>e.from===link.from&&e.to===to)) edges.push({from:link.from,to});
+    } else if(!tgt){
+      // dropped on empty canvas → SPAWN a new branch bubble here and connect
+      const pt=toCanvas(ev.clientX,ev.clientY);
+      const id='n'+(uid++);
+      nodes.push({id, x:pt.x-115, y:pt.y-10, title:'Bubble '+(uid-1), text:'New message bubble.'});
+      edges.push({from:link.from,to:id});
+      renderNodes();
     }
     if(tempPath){tempPath.remove();tempPath=null;}
     link=null; drawWires();
