@@ -226,7 +226,16 @@ app.post('/manychat/inbound', async (req, res) => {
     c = { id: 'mc-' + sid, subscriber_id: sid, name: b.name || 'Lead ' + sid.slice(-4), handle: b.user_name || '', channel: 'Telegram', avatarColor: '#0084FF', mode: 'approve', tag: 'review', updated: Date.now(), lead: {}, aiRead: [], nextStep: '', messages: [], suggestion: null };
     db.conversations.unshift(c);
   }
-  if (text) c.messages.push({ dir: 'in', text, t: Date.now() });
+  // try to grab a media/attachment URL if ManyChat ever sends one (not in default payload yet)
+  const mediaUrl = pickv('attachment_url', 'last_input_attachment', 'image_url', 'media_url', 'file_url', 'last_attachment_url');
+  if (text) {
+    c.messages.push({ dir: 'in', text, t: Date.now() });
+  } else if (mediaUrl) {
+    c.messages.push({ dir: 'in', text: '', mediaUrl, t: Date.now() });        // real image → render inline
+  } else {
+    // non-text user input (image/voice/sticker) with no URL — at least register it so it's not invisible
+    c.messages.push({ dir: 'in', text: '📷 Sent an image / media — not viewable here yet (open ManyChat to see it)', t: Date.now(), media: true });
+  }
   enrichEmail(c).catch(() => {}); // fire-and-forget: grab saved email on first contact
   const s = await suggest(c);
   c.suggestion = s; c.tag = c.mode === 'auto' ? 'auto' : 'review'; touch(c);
