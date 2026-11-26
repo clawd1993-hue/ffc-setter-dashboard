@@ -243,19 +243,6 @@ function seed(){
       {t:'msg', text:"No worries, I understand 🙏 Then the right move right now is the challenge, not Elite. You've got the training and products, you can get first sales on your own, I'm here to answer questions. When you're in a better position to go full force, reach back and we'll set up the call. I'll check in with you on [date] 🙌"}]},
     {id:'red_note', x:2860, y:4620, kind:'route', title:'→ cancel Calendly · tag UQ-red · check-in date 2–4 weeks out'},
 
-    // ===== YELLOW · shared tail (every type converges here) =====
-    {id:'proof_prop', x:1200, y:5500, title:'🟡 PROOF + PROPOSAL (every type lands here)', steps:[
-      {t:'flow', name:'Proof'},
-      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
-    {id:'rt_spot', x:1200, y:5820, kind:'route', title:'They say YES to a spot?'},
-    {id:'y_book', x:850, y:6120, title:'➡️ Book the call', steps:[
-      {t:'msg',  text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
-      {t:'flow', name:'Booking Link'}]},
-    {id:'y_no', x:1560, y:6120, title:'🟡 Said NO (now it\'s the investment)', steps:[
-      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
-    {id:'rt_nono', x:1560, y:6420, kind:'route', title:'Their answer?'},
-    {id:'y_nurture', x:1560, y:6700, title:'🟡 Nurture-yellow + check-in date', steps:[
-      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
 
     // ===== 2a · Price (has income) sub-branches =====
     {id:'rt_2a', x:320, y:5200, kind:'route', title:'Their answer?'},
@@ -295,8 +282,82 @@ function seed(){
       {t:'msg', text:'So it was never really about the money then — let me not sell you anything, what would make this a yes for you?'}]},
     {id:'y_2b_red', x:200, y:6560, title:'🔴 2b · hard no → downsell to challenge', steps:[
       {t:'msg', text:"No worries, I understand 🙏 Then the right move right now is the challenge, not Elite. You've got the training and products, get your first sales on your own, I'm here for questions. When you're in a better spot, reach back and we'll set up the call. I'll check in with you on [date] 🙌"}]},
-    {id:'y_2f_2c', x:2480, y:6020, title:'🟡 2f · has doubts → what would make it a yes?', steps:[
+{id:'y_2f_2c', x:2480, y:6020, title:'🟡 2f · has doubts → what would make it a yes?', steps:[
       {t:'msg', text:'Got it, smart to be cautious — so let me not sell you anything, what would make this a yes for you?'}]},
+
+    // ===== YELLOW · per-type tails (duplicated, no cross-column lines) =====
+    {id:'t2a_proof', x:90, y:6900, title:'🟡 2A · Proof + Proposal', steps:[
+      {t:'flow', name:'Proof'},
+      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+    {id:'t2a_spot', x:90, y:7220, kind:'route', title:'Yes to a spot?'},
+    {id:'t2a_book', x:-120, y:7500, title:'➡️ 2A · Book the call', steps:[
+      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'flow', name:'Booking Link'}]},
+    {id:'t2a_no', x:320, y:7500, title:'🟡 2A · No (now it\'s the money)', steps:[
+      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+    {id:'t2a_nono', x:320, y:7780, kind:'route', title:'Their answer?'},
+    {id:'t2a_nurture', x:320, y:8040, title:'🟡 2A · Nurture + check-in', steps:[
+      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+    {id:'t2b_proof', x:650, y:6900, title:'🟡 2B · Proof + Proposal', steps:[
+      {t:'flow', name:'Proof'},
+      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+    {id:'t2b_spot', x:650, y:7220, kind:'route', title:'Yes to a spot?'},
+    {id:'t2b_book', x:440, y:7500, title:'➡️ 2B · Book the call', steps:[
+      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'flow', name:'Booking Link'}]},
+    {id:'t2b_no', x:880, y:7500, title:'🟡 2B · No (now it\'s the money)', steps:[
+      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+    {id:'t2b_nono', x:880, y:7780, kind:'route', title:'Their answer?'},
+    {id:'t2b_nurture', x:880, y:8040, title:'🟡 2B · Nurture + check-in', steps:[
+      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+    {id:'t2c_proof', x:1210, y:6900, title:'🟡 2C · Proof + Proposal', steps:[
+      {t:'flow', name:'Proof'},
+      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+    {id:'t2c_spot', x:1210, y:7220, kind:'route', title:'Yes to a spot?'},
+    {id:'t2c_book', x:1000, y:7500, title:'➡️ 2C · Book the call', steps:[
+      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'flow', name:'Booking Link'}]},
+    {id:'t2c_no', x:1440, y:7500, title:'🟡 2C · No (now it\'s the money)', steps:[
+      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+    {id:'t2c_nono', x:1440, y:7780, kind:'route', title:'Their answer?'},
+    {id:'t2c_nurture', x:1440, y:8040, title:'🟡 2C · Nurture + check-in', steps:[
+      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+    {id:'t2d_proof', x:1770, y:6900, title:'🟡 2D · Proof + Proposal', steps:[
+      {t:'flow', name:'Proof'},
+      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+    {id:'t2d_spot', x:1770, y:7220, kind:'route', title:'Yes to a spot?'},
+    {id:'t2d_book', x:1560, y:7500, title:'➡️ 2D · Book the call', steps:[
+      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'flow', name:'Booking Link'}]},
+    {id:'t2d_no', x:2000, y:7500, title:'🟡 2D · No (now it\'s the money)', steps:[
+      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+    {id:'t2d_nono', x:2000, y:7780, kind:'route', title:'Their answer?'},
+    {id:'t2d_nurture', x:2000, y:8040, title:'🟡 2D · Nurture + check-in', steps:[
+      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+    {id:'t2e_proof', x:2330, y:6900, title:'🟡 2E · Proof + Proposal', steps:[
+      {t:'flow', name:'Proof'},
+      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+    {id:'t2e_spot', x:2330, y:7220, kind:'route', title:'Yes to a spot?'},
+    {id:'t2e_book', x:2120, y:7500, title:'➡️ 2E · Book the call', steps:[
+      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'flow', name:'Booking Link'}]},
+    {id:'t2e_no', x:2560, y:7500, title:'🟡 2E · No (now it\'s the money)', steps:[
+      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+    {id:'t2e_nono', x:2560, y:7780, kind:'route', title:'Their answer?'},
+    {id:'t2e_nurture', x:2560, y:8040, title:'🟡 2E · Nurture + check-in', steps:[
+      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+    {id:'t2f_proof', x:2890, y:6900, title:'🟡 2F · Proof + Proposal', steps:[
+      {t:'flow', name:'Proof'},
+      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+    {id:'t2f_spot', x:2890, y:7220, kind:'route', title:'Yes to a spot?'},
+    {id:'t2f_book', x:2680, y:7500, title:'➡️ 2F · Book the call', steps:[
+      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'flow', name:'Booking Link'}]},
+    {id:'t2f_no', x:3120, y:7500, title:'🟡 2F · No (now it\'s the money)', steps:[
+      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+    {id:'t2f_nono', x:3120, y:7780, kind:'route', title:'Their answer?'},
+    {id:'t2f_nurture', x:3120, y:8040, title:'🟡 2F · Nurture + check-in', steps:[
+      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
   );
   edges=[
     {from:'n1', to:'n2', label:'Beginner / first look'},
@@ -365,50 +426,58 @@ function seed(){
 
     // ---- Yellow deep handling ----
     // shared tail
-    {from:'proof_prop', to:'rt_spot'},
-    {from:'rt_spot', to:'y_book', label:'Yes'},
-    {from:'rt_spot', to:'y_no',   label:'No'},
-    {from:'y_no', to:'rt_nono'},
-    {from:'rt_nono', to:'y_book',    label:'Yes'},
-    {from:'rt_nono', to:'y_nurture', label:'No / unsure'},
     // 2a
     {from:'y_2a', to:'rt_2a'},
-    {from:'rt_2a', to:'proof_prop',  label:'Yes'},
+    {from:'rt_2a', to:'t2a_proof',  label:'Yes'},
     {from:'rt_2a', to:'y_2a_maybe',  label:'Maybe / not yet'},
-    {from:'y_2a_maybe', to:'proof_prop'},
+    {from:'y_2a_maybe', to:'t2a_proof'},
     {from:'y_2a', to:'y_2a_side', label:'too expensive (no number)'},
-    {from:'y_2a_side', to:'proof_prop'},
+    {from:'y_2a_side', to:'t2a_proof'},
     // 2b
     {from:'y_2b', to:'rt_2b1'},
-    {from:'rt_2b1', to:'proof_prop', label:'value first'},
+    {from:'rt_2b1', to:'t2b_proof', label:'value first'},
     {from:'rt_2b1', to:'y_2b_msg2',  label:'only the investment'},
     {from:'y_2b_msg2', to:'rt_2b2'},
-    {from:'rt_2b2', to:'y_book',    label:'yes'},
+    {from:'rt_2b2', to:'t2b_book', label:'yes'},
     {from:'rt_2b2', to:'y_2b_msg3', label:'no'},
     {from:'y_2b_msg3', to:'rt_2b3'},
-    {from:'rt_2b3', to:'y_book',   label:'clear yes'},
+    {from:'rt_2b3', to:'t2b_book', label:'clear yes'},
     {from:'rt_2b3', to:'y_2b_2c', label:"no/maybe → it's not the money"},
     {from:'rt_2b3', to:'y_2b_red', label:'hard no'},
-    {from:'y_2b_2c', to:'proof_prop'},
+    {from:'y_2b_2c', to:'t2b_proof'},
     // 2c
     {from:'y_2c', to:'rt_2c'},
-    {from:'rt_2c', to:'proof_prop',  label:'results / dodges'},
+    {from:'rt_2c', to:'t2c_proof',  label:'results / dodges'},
     {from:'rt_2c', to:'y_2c_guar',   label:'guarantee'},
     {from:'rt_2c', to:'y_2c_price',  label:'asks price'},
     {from:'rt_2c', to:'y_2c_call',   label:'see inside / talk to someone'},
-    {from:'y_2c_guar', to:'proof_prop'},
-    {from:'y_2c_price', to:'proof_prop'},
-    {from:'y_2c_call', to:'proof_prop'},
+    {from:'y_2c_guar', to:'t2c_proof'},
+    {from:'y_2c_price', to:'t2c_proof'},
+    {from:'y_2c_call', to:'t2c_proof'},
     // 2d / 2e → straight to proof+proposal
-    {from:'y_2d', to:'proof_prop'},
-    {from:'y_2e', to:'proof_prop'},
+    {from:'y_2d', to:'t2d_proof'},
+    {from:'y_2e', to:'t2e_proof'},
     // 2f
     {from:'y_2f', to:'rt_2f'},
     {from:'rt_2f', to:'y_2f_both', label:"I'd recommend it"},
     {from:'rt_2f', to:'y_2f_2c',   label:'doubts myself'},
-    {from:'y_2f_2c', to:'proof_prop'},
+    {from:'y_2f_2c', to:'t2f_proof'},
     {from:'y_2f_both', to:'rt_2f_yes'},
-    {from:'rt_2f_yes', to:'y_book', label:'yes'},
+    {from:'rt_2f_yes', to:'t2f_book', label:'yes'},
+
+    // per-type tail internal wiring
+    {from:'t2a_proof', to:'t2a_spot'}, {from:'t2a_spot', to:'t2a_book', label:'Yes'}, {from:'t2a_spot', to:'t2a_no', label:'No'},
+    {from:'t2a_no', to:'t2a_nono'}, {from:'t2a_nono', to:'t2a_book', label:'Yes'}, {from:'t2a_nono', to:'t2a_nurture', label:'No / unsure'},
+    {from:'t2b_proof', to:'t2b_spot'}, {from:'t2b_spot', to:'t2b_book', label:'Yes'}, {from:'t2b_spot', to:'t2b_no', label:'No'},
+    {from:'t2b_no', to:'t2b_nono'}, {from:'t2b_nono', to:'t2b_book', label:'Yes'}, {from:'t2b_nono', to:'t2b_nurture', label:'No / unsure'},
+    {from:'t2c_proof', to:'t2c_spot'}, {from:'t2c_spot', to:'t2c_book', label:'Yes'}, {from:'t2c_spot', to:'t2c_no', label:'No'},
+    {from:'t2c_no', to:'t2c_nono'}, {from:'t2c_nono', to:'t2c_book', label:'Yes'}, {from:'t2c_nono', to:'t2c_nurture', label:'No / unsure'},
+    {from:'t2d_proof', to:'t2d_spot'}, {from:'t2d_spot', to:'t2d_book', label:'Yes'}, {from:'t2d_spot', to:'t2d_no', label:'No'},
+    {from:'t2d_no', to:'t2d_nono'}, {from:'t2d_nono', to:'t2d_book', label:'Yes'}, {from:'t2d_nono', to:'t2d_nurture', label:'No / unsure'},
+    {from:'t2e_proof', to:'t2e_spot'}, {from:'t2e_spot', to:'t2e_book', label:'Yes'}, {from:'t2e_spot', to:'t2e_no', label:'No'},
+    {from:'t2e_no', to:'t2e_nono'}, {from:'t2e_nono', to:'t2e_book', label:'Yes'}, {from:'t2e_nono', to:'t2e_nurture', label:'No / unsure'},
+    {from:'t2f_proof', to:'t2f_spot'}, {from:'t2f_spot', to:'t2f_book', label:'Yes'}, {from:'t2f_spot', to:'t2f_no', label:'No'},
+    {from:'t2f_no', to:'t2f_nono'}, {from:'t2f_nono', to:'t2f_book', label:'Yes'}, {from:'t2f_nono', to:'t2f_nurture', label:'No / unsure'},
   ];
   uid=4;
   applySavedPositions();   // overlay any positions you've dragged (saved in this browser)
