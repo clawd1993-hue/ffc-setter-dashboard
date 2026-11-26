@@ -506,6 +506,7 @@ app.get('/api/conversation/:id', async (req, res) => {
   // Follow-Up suggestion: if this lead is overdue (fu1..fu5) and we spoke last, draft the next
   // nudge (once per step). Non-blocking — the thread auto-refreshes to pick it up in a few sec.
   const st = statusOf(c);
+  if (req.query.refu) delete c.fuSuggestion; // ?refu=1 forces a fresh FU draft (e.g. after a prompt change)
   if (/^fu[1-5]$/.test(st)) {
     const step = parseInt(st.slice(2), 10);
     if (!c.fuSuggestion || c.fuSuggestion.step !== step) {
