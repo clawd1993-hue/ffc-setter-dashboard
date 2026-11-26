@@ -223,13 +223,13 @@ function drawWires(){
       t.textContent=e.label;
       g.appendChild(rect);g.appendChild(t);
       g.style.cursor='pointer';
-      g.addEventListener('click',ev=>{ev.stopPropagation();scrollToNode(e.to);}); // label = jump to next bubble
+      g.addEventListener('click',ev=>{ev.stopPropagation();focusNode(e.to);}); // label = zoom+jump to next bubble
       g.addEventListener('dblclick',ev=>{ev.stopPropagation();editEdge(i);});      // double-click to edit/delete
       svg.appendChild(g);
     }
   });
 }
-// smooth-scroll the board so a node is centered in view
+// smooth-scroll the board so a node is centered in view (at the current zoom)
 function scrollToNode(id){
   const n=nodeById(id); if(!n)return;
   const board=document.getElementById('board'), h=nodeH(id);
@@ -238,6 +238,14 @@ function scrollToNode(id){
     top:(n.y+h/2)*zoom-board.clientHeight/2,
     behavior:'smooth'
   });
+}
+// click a bubble / label → zoom to a focused level AND smooth-scroll it into the center
+const FOCUS_ZOOM=1;
+function focusNode(id){
+  canvas.style.transition='transform .35s ease';   // animate the scale just for this focus
+  setZoom(FOCUS_ZOOM);
+  scrollToNode(id);
+  setTimeout(()=>{canvas.style.transition='';},400); // clear so pinch-zoom stays snappy
 }
 function editEdge(i){
   const e=edges[i]; if(!e)return;
@@ -255,7 +263,7 @@ function wireInteractions(){
     el.addEventListener('pointerdown',ev=>{
       if(ev.target.classList.contains('port')) return; // handled below
       const n=nodeById(id); const p=toCanvas(ev.clientX,ev.clientY);
-      drag={id,dx:p.x-n.x,dy:p.y-n.y,el};
+      drag={id,dx:p.x-n.x,dy:p.y-n.y,el,sx:ev.clientX,sy:ev.clientY};
       el.classList.add('drag'); el.setPointerCapture(ev.pointerId);
     });
     el.querySelector('.port.out').addEventListener('pointerdown',ev=>{
@@ -284,7 +292,12 @@ document.addEventListener('pointermove',ev=>{
   }
 });
 document.addEventListener('pointerup',ev=>{
-  if(drag){ drag.el.classList.remove('drag'); drag=null; }
+  if(drag){
+    drag.el.classList.remove('drag');
+    const moved=Math.hypot(ev.clientX-drag.sx, ev.clientY-drag.sy)>5;
+    const id=drag.id; drag=null;
+    if(!moved) focusNode(id); // a plain click (no drag) → zoom+center this bubble
+  }
   if(link){
     const over=document.elementFromPoint(ev.clientX,ev.clientY);
     const tgt=over&&over.closest('.node');
