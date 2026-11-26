@@ -186,7 +186,7 @@ function seed(){
     {from:'hub3', to:'s3_fam',   label:'Family / freedom'},
     {from:'hub3', to:'s3_mon',   label:'Just money'},
     // "just money" surfaces their real why → route it like a why-now (loops back to the hub)
-    {from:'s3_mon', to:'hub3', label:'↩ loops back — re-route by their real why'},
+    {from:'s3_mon', to:'hub3', loop:true, label:'↩ loops back — re-route by their real why'},
   ];
   uid=4;
   renderNodes(); drawWires();
@@ -236,16 +236,26 @@ function drawWires(){
   [...svg.querySelectorAll('.wire,.wirelabel')].forEach(e=>e.remove());
   edges.forEach((e,i)=>{
     const a=nodeById(e.from), b=nodeById(e.to); if(!a||!b)return;
-    const A=centerOut(a), B=centerIn(b);
+    let A,B,dStr,lx,ly;
+    if(e.loop){
+      // loop-back: exit the RIGHT side, bow out to the right, re-enter the target's right side
+      const hA=nodeH(a.id), hB=nodeH(b.id), bow=300;
+      A={x:a.x+230, y:a.y+hA/2}; B={x:b.x+230, y:b.y+hB/2};
+      dStr=`M ${A.x} ${A.y} C ${A.x+bow} ${A.y}, ${B.x+bow} ${B.y}, ${B.x} ${B.y}`;
+      lx=Math.max(A.x,B.x)+bow*0.6; ly=(A.y+B.y)/2;
+    } else {
+      A=centerOut(a); B=centerIn(b); dStr=pathD(A,B);
+      lx=(A.x+B.x)/2; ly=(A.y+B.y)/2;
+    }
     const p=document.createElementNS('http://www.w3.org/2000/svg','path');
     p.setAttribute('class','wire');
-    p.setAttribute('d',pathD(A,B));
+    p.setAttribute('d',dStr);
     p.setAttribute('fill','none'); p.setAttribute('stroke','#9AA7B8'); p.setAttribute('stroke-width','2');
     p.setAttribute('marker-end','url(#arrow)');
     p.addEventListener('click',()=>editEdge(i));
     svg.appendChild(p);
     if(e.label){
-      const mx=(A.x+B.x)/2, my=(A.y+B.y)/2;
+      const mx=lx, my=ly;
       const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('class','wirelabel');
       const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
       const w=e.label.length*7.5+16;
