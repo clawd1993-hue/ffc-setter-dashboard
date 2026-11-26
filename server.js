@@ -337,20 +337,25 @@ async function generateFuSuggestion(c, step) {
     const tone = step <= 2 ? 'gentle' : step <= 4 ? 'a bit more direct' : 'a graceful break-up (give them an easy out)';
     const msg = await client.messages.create({
       model: 'claude-sonnet-5', max_tokens: 200,
-      system: `You are Paul, an FFC (Faceless Funnel Challenge) DM setter. A lead has gone quiet after we last messaged them — write the NEXT follow-up nudge. This is follow-up #${step}, so tone = ${tone}.
-Use the SCRIPT to understand where in the flow the conversation actually is, then use the FU BANK to pick the right nudge for that stage.
-Rules:
-- Read the transcript: nudge whatever was genuinely the LAST thing we said that they didn't reply to. Never reference an older topic that's since moved on.
-- Prefer a line from the FU bank that fits the current stage. If the convo went off-script and nothing fits, write a short custom nudge in the same warm human style.
-- NEVER reuse a line already sent in the transcript — especially the once-ever pool lines (the "1 to 10", "where are you at", and the "one last message" close).
-- Fill tokens ([name], [their reason], [their goal]) from the transcript; if unknown, drop them naturally.
-- Output ONLY the message text to send. One short message. No preamble, no quotes.
+      system: `You are Paul, an FFC (Faceless Funnel Challenge) DM setter. A lead has gone quiet after we last messaged them — write the NEXT follow-up NUDGE. This is follow-up #${step}, so tone = ${tone}.
 
-SCRIPT (for stage context):
-${MAIN_SCRIPT}
+CRITICAL: The follow-up message MUST come from the FU BANK below (or a short custom nudge in that exact style). NEVER re-send or re-ask a line from the main script — the script is ONLY to help you work out what STAGE they went quiet at. Re-sending the script question (e.g. "have you tried building something online before…") is WRONG. A follow-up is a light nudge to re-engage, not a repeat of the question they ignored.
 
-FU BANK:
-${FU_BANK}`,
+How to pick:
+- Figure out the LAST thing we said that they didn't answer, and which FU-bank ladder that maps to:
+  · They never replied to the very first setter message → "NEVER REPLIED AT ALL" ladder (FU1 is literally just "[name]?").
+  · Went quiet after "did you watch the first video?" → that ladder.
+  · Went quiet after "why now?" → that ladder.
+- Use follow-up #${step} = the Nth rung of that ladder (gentle early, more direct later).
+- NEVER reuse a line already in the transcript — especially the once-ever pool lines ("1 to 10", "where are you at", the "one last message" close).
+- Fill tokens ([name], [their reason], [their goal]) from the transcript; drop them if unknown.
+- Output ONLY the message text. One short message. No preamble, no quotes.
+
+FU BANK (your ONLY source for the nudge):
+${FU_BANK}
+
+SCRIPT (reference ONLY — to identify the stage; do NOT copy lines from it):
+${MAIN_SCRIPT}`,
       messages: [{ role: 'user', content: `Transcript so far:\n${transcript}\n\nWrite follow-up #${step}.` }],
     });
     const fuOut = (msg.content.find(b => b.type === 'text') || {}).text || '';
