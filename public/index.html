@@ -518,6 +518,7 @@ function favHost(u){try{return new URL(u).hostname;}catch(e){return (u||'').repl
 // real product icons (Google's favicon service returns a generic "G" for docs.google.com)
 function favIcon(u){
   const url=(u||'').toLowerCase();
+  if(url.includes('/flow.html'))return 'https://www.gstatic.com/images/branding/product/2x/docs_2020q4_48dp.png'; // Main Script tree keeps the Docs look
   if(url.includes('docs.google.com/spreadsheets')||url.includes('sheets.google.com'))return 'https://www.gstatic.com/images/branding/product/2x/sheets_2020q4_48dp.png';
   if(url.includes('docs.google.com/document'))return 'https://www.gstatic.com/images/branding/product/2x/docs_2020q4_48dp.png';
   if(url.includes('docs.google.com/presentation'))return 'https://www.gstatic.com/images/branding/product/2x/slides_2020q4_48dp.png';
