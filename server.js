@@ -276,6 +276,8 @@ app.post('/manychat/inbound', async (req, res) => {
   if (!c) {
     c = { id: 'mc-' + sid, subscriber_id: sid, name: b.name || 'Lead ' + sid.slice(-4), handle: b.user_name || '', channel: 'Telegram', avatarColor: '#0084FF', mode: 'approve', tag: 'review', updated: Date.now(), lead: {}, aiRead: [], nextStep: '', messages: [], suggestion: null };
     db.conversations.unshift(c);
+  } else if (b.name && /^Lead \d{4}$/.test(c.name || '')) {
+    c.name = b.name; // upgrade a nameless "Lead 1234" placeholder once a real name arrives
   }
   if (text) {
     c.messages.push({ dir: 'in', text, t: Date.now() });
