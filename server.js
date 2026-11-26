@@ -172,6 +172,8 @@ async function enrichRealName(c) {
       const first = tc((hit.firstName || uniq[0] || '').trim().split(/\s+/)[0]); // single first name for messaging
       if (first) c.firstName = first;
       if (full) c.realName = full;
+      // if the display name is still a nameless "Lead 1234" placeholder, upgrade it to the real name
+      if (full && /^Lead \d{4}$/.test(c.name || '')) c.name = full;
     }
     touch(c);
   } catch (e) { c.realNameV2 = true; }
@@ -379,6 +381,8 @@ app.get('/api/conversation/:id', async (req, res) => {
   const c = convo(req.params.id); if (!c) return res.status(404).json({ error: 'not found' });
   if (!c.email) await enrichEmail(c); // backfill email on open
   if (!c.realNameV2) await enrichRealName(c); // backfill real checkout name from GHL
+  // upgrade a leftover "Lead 1234" placeholder if we already know the real name (e.g. mirror-created leads)
+  if (c.realName && /^Lead \d{4}$/.test(c.name || '')) { c.name = c.realName; touch(c); }
   // Follow-Up suggestion: if this lead is overdue (fu1..fu5) and we spoke last, draft the next
   // nudge (once per step). Non-blocking — the thread auto-refreshes to pick it up in a few sec.
   const st = statusOf(c);
