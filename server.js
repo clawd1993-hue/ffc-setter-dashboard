@@ -221,9 +221,9 @@ AUTOMATIONS — what each one already SAYS (so you NEVER repeat its content in y
 Rule: when you fire an automation, your text must NOT duplicate what that automation already says.
 
 STEP 1 (clean text, no greeting — the Welcome VN already greeted them): "Quick one before we dive in, have you tried building something online before, or is this your first real look into it?"
- - Beginner → "no worries then, you're exactly who this was built for. Most of our best students started from zero." then the What-is-FFC VN.
- - Tried before → "nice, so you already know the game. The part most people get stuck on is the offer, not the tech." then the VN.
- → then: "have you had a chance to watch the first video of the training yet?"
+ - Beginner → "Sure, no worries then — you're exactly who this was built for. Most of our best students started from zero. Let me send you a quick voice note so you get how the whole thing works 👇" → then fire What is FFC.
+ - Tried before → "Ah nice, so you already know the game. That makes this easier — the part most people get stuck on is the offer, not the tech. Let me send you a quick voice note on how we do it differently 👇" → then fire What is FFC.
+ → then: "So have you had a chance to watch the first video of the training yet?"
 
 STEP 2 "WHY NOW": "why now? what changed recently that made you go 'ok, I need to figure this out' this month rather than next year?"
  - Not watched the video → "no worries! it's only 10 min and everything after makes way more sense once you've seen it 🙌 while you get to it, why now?"
