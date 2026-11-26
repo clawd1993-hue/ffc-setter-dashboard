@@ -276,7 +276,8 @@ app.post('/manychat/mirror', (req, res) => {
   let text = pickv('text', 'message', 'last_input_text', 'last_text_input', 'last_text', 'last_input');
   const label = pickv('label');
   if (label) text = `⚙️ ${label}${text ? ': ' + text : ''}`;
-  if (!sid || !text) return res.json({ ok: false, note: 'need subscriber_id + text' });
+  const MC_OK = { version: 'v2', content: { messages: [] } }; // ManyChat-compatible response (no "invalid format" warning)
+  if (!sid || !text) return res.json(MC_OK);
   const dir = pickv('dir', 'direction').toLowerCase().startsWith('in') ? 'in' : 'out';
   let c = db.conversations.find(x => x.subscriber_id === sid);
   if (!c) {
@@ -286,11 +287,11 @@ app.post('/manychat/mirror', (req, res) => {
   }
   // dedupe: ignore identical dir+text within 15s (ManyChat can retry External Requests)
   const last = c.messages.at(-1);
-  if (last && last.dir === dir && last.text === text && Date.now() - last.t < 15000) return res.json({ ok: true, deduped: true });
+  if (last && last.dir === dir && last.text === text && Date.now() - last.t < 15000) return res.json(MC_OK);
   c.messages.push({ dir, text, t: Date.now(), mirror: true });
   if (dir === 'in' && pickv('email')) c.email = c.email || pickv('email');
   touch(c);
-  res.json({ ok: true });
+  res.json(MC_OK);
 });
 
 // 2) dashboard feeds
