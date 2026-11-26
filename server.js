@@ -239,7 +239,8 @@ SCRIPT:
 ${MAIN_SCRIPT}`,
       messages: [{ role: 'user', content: `Conversation so far:\n${transcript}\n\nWrite the next reply, following the script for where this lead is.` }],
     });
-    return { text: msg.content[0].text.trim(), confidence: 0.8 };
+    const out = (msg.content.find(b => b.type === 'text') || {}).text || '';
+    return { text: out.trim(), confidence: 0.8 };
   } catch (e) {
     return { text: `(brain error: ${e.message})`, confidence: 0, stub: true };
   }
@@ -290,7 +291,8 @@ FU BANK:
 ${FU_BANK}`,
       messages: [{ role: 'user', content: `Transcript so far:\n${transcript}\n\nWrite follow-up #${step}.` }],
     });
-    c.fuSuggestion = { text: msg.content[0].text.trim(), step, t: Date.now() };
+    const fuOut = (msg.content.find(b => b.type === 'text') || {}).text || '';
+    c.fuSuggestion = { text: fuOut.trim(), step, t: Date.now() };
   } catch (e) {
     c.fuSuggestion = { text: `(FU brain error: ${e.message})`, step, t: Date.now(), stub: true };
   }
