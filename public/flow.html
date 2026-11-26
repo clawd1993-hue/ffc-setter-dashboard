@@ -283,7 +283,8 @@ function drawWires(){
       const hA=nodeH(a.id), hB=nodeH(b.id);
       A={x:a.x+(dir<0?0:230), y:a.y+hA/2}; B={x:b.x+(dir<0?0:230), y:b.y+hB/2};
       dStr=`M ${A.x} ${A.y} C ${A.x+dir*amt} ${A.y}, ${B.x+dir*amt} ${B.y}, ${B.x} ${B.y}`;
-      lx=(dir<0?Math.min(A.x,B.x):Math.max(A.x,B.x))+dir*amt*0.6; ly=(A.y+B.y)/2;
+      // label sits on the curve's midpoint (cubic bezier at t=0.5): (P0+3P1+3P2+P3)/8
+      lx=(A.x+B.x)/2 + 0.75*dir*amt; ly=(A.y+B.y)/2;
     } else {
       A=centerOut(a); B=centerIn(b); dStr=pathD(A,B);
       lx=(A.x+B.x)/2; ly=(A.y+B.y)/2;
