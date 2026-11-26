@@ -445,9 +445,10 @@ app.post('/manychat/mirror', (req, res) => {
   // dedupe: ignore identical dir+text within 15s (ManyChat can retry External Requests)
   const last = c.messages.at(-1);
   if (last && last.dir === dir && last.text === text && Date.now() - last.t < 15000) return res.json(MC_OK);
-  // mirrored automation narration (e.g. the Welcome flow) is NOT a human setter reply —
-  // keep the convo in "Needs review" so a setter still picks it up. A real /api/send flips it.
-  c.messages.push({ dir, text, t: Date.now(), mirror: true, forceReview: true });
+  // mirrored automation narration (e.g. the Welcome flow). Status is derived purely from who
+  // spoke last: an OUTBOUND welcome = we spoke last = "Replied" (waiting on them) → FU if they go
+  // silent. Only the lead actually messaging back (via /manychat/inbound) = "Needs review".
+  c.messages.push({ dir, text, t: Date.now(), mirror: true });
   if (dir === 'in' && pickv('email')) c.email = c.email || pickv('email');
   touch(c);
   res.json(MC_OK);
@@ -468,7 +469,6 @@ function fuStepForSilence(hours) {
 function statusOf(c) {
   const last = c.messages && c.messages.at(-1);
   if (!last) return 'review';
-  if (last.forceReview) return 'review';           // last was automation narration (Welcome mirror), not a human reply
   if (last.dir === 'out') {                         // we spoke last
     const step = fuStepForSilence((Date.now() - last.t) / 3600000);
     return step ? ('fu' + step) : 'replied';        // recent = replied; aged = fu1..fu5
