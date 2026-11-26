@@ -86,7 +86,7 @@ let nodes=[], edges=[], uid=1, zoom=1;
 
 // ---- zoom ----
 function setZoom(z){
-  zoom=Math.min(1.5,Math.max(0.15,Math.round(z*100)/100));
+  zoom=Math.min(1.5,Math.max(0.45,Math.round(z*100)/100));
   canvas.style.transformOrigin='0 0';
   canvas.style.transform='scale('+zoom+')';
   const zl=document.getElementById('zlabel'); if(zl) zl.textContent=Math.round(zoom*100)+'%';
