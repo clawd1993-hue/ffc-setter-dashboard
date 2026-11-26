@@ -82,7 +82,7 @@
       </svg>
     </div>
   </div>
-  <div class="hint">Click a label to jump to that branch · double-click a label (or click the line) to edit/delete · drag bubbles to move · bottom dot → empty space splits a branch · ⌘/Ctrl-scroll or pinch to zoom</div>
+  <div class="hint">Drag bubbles to move (auto-saves) · DRAG a label to bend its arrow through it · click a label = jump · double-click a label (or the line) = edit/delete · ⌘/Ctrl-scroll or pinch to zoom · "Reset layout" clears your drags</div>
 
 <script>
 const canvas=document.getElementById('canvas');
@@ -265,13 +265,17 @@ function seed(){
 
 // ---- layout persistence (your drags auto-save to this browser; content/edges stay code-driven) ----
 function savePositions(){
-  const m={}; nodes.forEach(n=>{ m[n.id]={x:n.x,y:n.y}; });
-  try{ localStorage.setItem('flowPos', JSON.stringify(m)); }catch(e){}
+  const pos={}; nodes.forEach(n=>{ pos[n.id]={x:n.x,y:n.y}; });
+  const mids={}; edges.forEach(e=>{ if(e.mid) mids[e.from+'>'+e.to]={x:e.mid.x,y:e.mid.y}; });
+  try{ localStorage.setItem('flowPos', JSON.stringify({pos,mids})); }catch(e){}
 }
 function applySavedPositions(){
   try{
-    const m=JSON.parse(localStorage.getItem('flowPos')||'{}');
-    nodes.forEach(n=>{ if(m[n.id]){ n.x=m[n.id].x; n.y=m[n.id].y; } });
+    const raw=JSON.parse(localStorage.getItem('flowPos')||'{}');
+    const pos=raw.pos||raw; // backward-compat with old positions-only format
+    nodes.forEach(n=>{ if(pos[n.id]){ n.x=pos[n.id].x; n.y=pos[n.id].y; } });
+    const mids=raw.mids||{};
+    edges.forEach(e=>{ const k=e.from+'>'+e.to; if(mids[k]) e.mid=mids[k]; });
   }catch(e){}
 }
 function resetLayout(){
@@ -324,18 +328,21 @@ function drawWires(){
   [...svg.querySelectorAll('.wire,.wirelabel')].forEach(e=>e.remove());
   edges.forEach((e,i)=>{
     const a=nodeById(e.from), b=nodeById(e.to); if(!a||!b)return;
-    let A,B,dStr,lx,ly;
+    let A,B,lx,ly;
     if(e.loop){
-      // loop-back: exit the RIGHT side, bow out to the right, re-enter the target's right side
       const hA=nodeH(a.id), hB=nodeH(b.id), bow=300;
       A={x:a.x+230, y:a.y+hA/2}; B={x:b.x+230, y:b.y+hB/2};
-      dStr=`M ${A.x} ${A.y} C ${A.x+bow} ${A.y}, ${B.x+bow} ${B.y}, ${B.x} ${B.y}`;
-      // label on the curve's midpoint (cubic bezier at t=0.5)
       lx=(A.x+B.x)/2 + 0.75*bow; ly=(A.y+B.y)/2;
-    } else {
-      A=centerOut(a); B=centerIn(b); dStr=pathD(A,B);
-      lx=(A.x+B.x)/2; ly=(A.y+B.y)/2;
-    }
+    } else { A=centerOut(a); B=centerIn(b); lx=(A.x+B.x)/2; ly=(A.y+B.y)/2; }
+    // if you've dragged the label, bend the curve THROUGH that point; else default shape
+    let dStr;
+    if(e.mid){
+      const cx=2*e.mid.x-(A.x+B.x)/2, cy=2*e.mid.y-(A.y+B.y)/2; // control so bezier passes through mid at t=.5
+      dStr=`M ${A.x} ${A.y} Q ${cx} ${cy} ${B.x} ${B.y}`;
+      lx=e.mid.x; ly=e.mid.y;
+    } else if(e.loop){
+      const bow=300; dStr=`M ${A.x} ${A.y} C ${A.x+bow} ${A.y}, ${B.x+bow} ${B.y}, ${B.x} ${B.y}`;
+    } else { dStr=pathD(A,B); }
     const p=document.createElementNS('http://www.w3.org/2000/svg','path');
     p.setAttribute('class','wire');
     p.setAttribute('d',dStr);
@@ -355,9 +362,10 @@ function drawWires(){
       t.setAttribute('font-size','12');t.setAttribute('font-weight','600');t.setAttribute('fill','#3A4A5C');
       t.textContent=e.label;
       g.appendChild(rect);g.appendChild(t);
-      g.style.cursor='pointer';
-      g.addEventListener('click',ev=>{ev.stopPropagation();focusNode(e.to);}); // label = zoom+jump to next bubble
-      g.addEventListener('dblclick',ev=>{ev.stopPropagation();editEdge(i);});      // double-click to edit/delete
+      g.style.cursor='grab';
+      // drag the label → bends the arrow through it; a plain click (no drag) = jump; dbl-click = edit
+      g.addEventListener('pointerdown',ev=>{ ev.stopPropagation(); labelDrag={i, sx:ev.clientX, sy:ev.clientY, moved:false}; });
+      g.addEventListener('dblclick',ev=>{ ev.stopPropagation(); editEdge(i); });
       svg.appendChild(g);
     }
   });
@@ -406,7 +414,7 @@ function editEdge(i){
 }
 
 // ---- interactions: drag nodes + draw connections ----
-let drag=null, link=null, tempPath=null;
+let drag=null, link=null, tempPath=null, labelDrag=null;
 function wireInteractions(){
   canvas.querySelectorAll('.node').forEach(el=>{
     const id=el.dataset.id;
@@ -436,6 +444,11 @@ document.addEventListener('pointermove',ev=>{
     n.x=p.x-drag.dx; n.y=p.y-drag.dy;
     drag.el.style.left=n.x+'px'; drag.el.style.top=n.y+'px';
     drawWires();
+  } else if(labelDrag){
+    const p=toCanvas(ev.clientX,ev.clientY);
+    edges[labelDrag.i].mid={x:p.x, y:p.y};              // drag label = bend the arrow through it
+    if(Math.hypot(ev.clientX-labelDrag.sx, ev.clientY-labelDrag.sy)>4) labelDrag.moved=true;
+    drawWires();
   } else if(link){
     const a=centerOut(nodeById(link.from));
     const pt=toCanvas(ev.clientX,ev.clientY);
@@ -443,6 +456,11 @@ document.addEventListener('pointermove',ev=>{
   }
 });
 document.addEventListener('pointerup',ev=>{
+  if(labelDrag){
+    if(labelDrag.moved) savePositions();               // persist the new arc
+    else focusNode(edges[labelDrag.i].to);             // plain click on label = jump to that bubble
+    labelDrag=null;
+  }
   if(drag){
     drag.el.classList.remove('drag');
     const moved=Math.hypot(ev.clientX-drag.sx, ev.clientY-drag.sy)>5;
