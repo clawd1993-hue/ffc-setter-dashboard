@@ -185,6 +185,8 @@ function seed(){
     {from:'hub3', to:'s3_money', label:'Money tight'},
     {from:'hub3', to:'s3_fam',   label:'Family / freedom'},
     {from:'hub3', to:'s3_mon',   label:'Just money'},
+    // "just money" surfaces their real why → route it like a why-now (loops back to the hub)
+    {from:'s3_mon', to:'hub3', label:'their answer → re-route'},
   ];
   uid=4;
   renderNodes(); drawWires();
@@ -388,10 +390,6 @@ function resetView(){
 
 try { seed(); } catch(err){ document.querySelector('.topbar .sub').textContent='INIT ERROR: '+err.message; console.error(err); }
 resetView();
-// debug readout: nodes / edges / wires actually drawn
-setTimeout(()=>{ const s=document.querySelector('.topbar .sub');
-  if(s && !s.textContent.startsWith('INIT')) s.textContent=`nodes ${nodes.length} · edges ${edges.length} · wires ${svg.querySelectorAll('.wire').length}`;
-},200);
 </script>
 </body>
 </html>
