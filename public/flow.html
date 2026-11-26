@@ -58,6 +58,10 @@
     <h1>Main Script Flow</h1>
     <span class="sub">top → bottom · logic tree</span>
     <div class="spacer"></div>
+    <button class="btn" onclick="setZoom(zoom-0.1)">−</button>
+    <span id="zlabel" style="font-size:12px;color:var(--muted);min-width:40px;text-align:center;">100%</span>
+    <button class="btn" onclick="setZoom(zoom+0.1)">+</button>
+    <button class="btn" onclick="fitAll()">Fit</button>
     <button class="btn" onclick="resetView()">Reset view</button>
     <button class="btn primary" onclick="addNode()">+ Add bubble</button>
   </div>
@@ -73,12 +77,42 @@
       </svg>
     </div>
   </div>
-  <div class="hint">Drag bubbles to move · drag the bottom dot onto empty space to split a new branch, or onto a bubble to connect · click an arrow to label it (Yes/No) or delete</div>
+  <div class="hint">Drag bubbles to move · bottom dot → empty space splits a new branch · click an arrow to label/delete · ⌘/Ctrl-scroll or pinch to zoom · "Fit" zooms to the whole tree</div>
 
 <script>
 const canvas=document.getElementById('canvas');
 const svg=document.getElementById('wires');
-let nodes=[], edges=[], uid=1;
+let nodes=[], edges=[], uid=1, zoom=1;
+
+// ---- zoom ----
+function setZoom(z){
+  zoom=Math.min(1.5,Math.max(0.15,Math.round(z*100)/100));
+  canvas.style.transformOrigin='0 0';
+  canvas.style.transform='scale('+zoom+')';
+  const zl=document.getElementById('zlabel'); if(zl) zl.textContent=Math.round(zoom*100)+'%';
+}
+// ⌘/ctrl-scroll or trackpad pinch to zoom toward the cursor
+document.getElementById('board').addEventListener('wheel',e=>{
+  if(!(e.ctrlKey||e.metaKey)) return;
+  e.preventDefault();
+  const board=document.getElementById('board'), r=board.getBoundingClientRect();
+  const before=toCanvas(e.clientX,e.clientY);
+  setZoom(zoom*(e.deltaY<0?1.1:0.9));
+  const after=toCanvas(e.clientX,e.clientY);
+  board.scrollLeft+=(before.x-after.x)*zoom;
+  board.scrollTop +=(before.y-after.y)*zoom;
+},{passive:false});
+// zoom so the whole tree fits the viewport
+function fitAll(){
+  if(!nodes.length) return;
+  const board=document.getElementById('board');
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  nodes.forEach(n=>{const h=nodeH(n.id);minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+230);maxY=Math.max(maxY,n.y+h);});
+  const pad=120, w=maxX-minX+pad*2, h=maxY-minY+pad*2;
+  const z=Math.min(board.clientWidth/w, board.clientHeight/h, 1.2);
+  setZoom(z);
+  board.scrollTo({left:(minX-pad)*zoom, top:(minY-pad)*zoom, behavior:'smooth'});
+}
 
 // ---- seed: 3 dummy bubbles chained top → bottom ----
 function seed(){
@@ -183,7 +217,8 @@ function wireInteractions(){
     const id=el.dataset.id;
     el.addEventListener('pointerdown',ev=>{
       if(ev.target.classList.contains('port')) return; // handled below
-      const n=nodeById(id); drag={id,dx:ev.clientX-n.x,dy:ev.clientY-n.y,el};
+      const n=nodeById(id); const p=toCanvas(ev.clientX,ev.clientY);
+      drag={id,dx:p.x-n.x,dy:p.y-n.y,el};
       el.classList.add('drag'); el.setPointerCapture(ev.pointerId);
     });
     el.querySelector('.port.out').addEventListener('pointerdown',ev=>{
@@ -201,8 +236,8 @@ function wireInteractions(){
 
 document.addEventListener('pointermove',ev=>{
   if(drag){
-    const n=nodeById(drag.id);
-    n.x=ev.clientX-drag.dx; n.y=ev.clientY-drag.dy;
+    const n=nodeById(drag.id); const p=toCanvas(ev.clientX,ev.clientY);
+    n.x=p.x-drag.dx; n.y=p.y-drag.dy;
     drag.el.style.left=n.x+'px'; drag.el.style.top=n.y+'px';
     drawWires();
   } else if(link){
@@ -235,7 +270,7 @@ document.addEventListener('pointerup',ev=>{
 // translate a viewport point into canvas coordinates (account for scroll)
 function toCanvas(cx,cy){
   const board=document.getElementById('board'), r=board.getBoundingClientRect();
-  return {x:cx-r.left+board.scrollLeft, y:cy-r.top+board.scrollTop};
+  return {x:(cx-r.left+board.scrollLeft)/zoom, y:(cy-r.top+board.scrollTop)/zoom};
 }
 
 function addNode(){
