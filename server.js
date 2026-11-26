@@ -539,6 +539,18 @@ app.post('/api/close', (req, res) => {
   res.json({ ok: true, closed: c.closed });
 });
 
+// hard-delete a conversation (test cleanup) — removes from memory + Supabase + unlinks tgId
+app.delete('/api/conversation/:id', async (req, res) => {
+  const id = req.params.id;
+  const idx = db.conversations.findIndex(c => c.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'not found' });
+  const [gone] = db.conversations.splice(idx, 1);
+  if (gone && gone.tgId) { for (const k of Object.keys(HELD_MEDIA)) if (k === gone.tgId) delete HELD_MEDIA[k]; }
+  save(db);
+  if (USE_DB) { try { await sb(`${SB_TABLE}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); } catch (e) { return res.json({ ok: true, memory: true, dbWarn: e.message }); } }
+  res.json({ ok: true, deleted: id });
+});
+
 // list saved flows (so we can grab flow_ns ids) — pass-through
 app.get('/api/flows', async (_req, res) => {
   if (!MANYCHAT_TOKEN) return res.json({ stub: true, note: 'set MANYCHAT_TOKEN' });
