@@ -218,7 +218,7 @@ function renderNodes(){
     }
     canvas.appendChild(el);
   });
-  wireInteractions();
+  try{ wireInteractions(); }catch(err){ console.error('wireInteractions failed:', err); } // never let this block drawWires
 }
 function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 
@@ -315,7 +315,8 @@ function wireInteractions(){
       drag={id,dx:p.x-n.x,dy:p.y-n.y,el,sx:ev.clientX,sy:ev.clientY};
       el.classList.add('drag'); el.setPointerCapture(ev.pointerId);
     });
-    el.querySelector('.port.out').addEventListener('pointerdown',ev=>{
+    const outPort=el.querySelector('.port.out'); if(!outPort) return;
+    outPort.addEventListener('pointerdown',ev=>{
       ev.stopPropagation();
       link={from:id};
       tempPath=document.createElementNS('http://www.w3.org/2000/svg','path');
