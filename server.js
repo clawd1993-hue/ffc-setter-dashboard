@@ -76,11 +76,12 @@ function loadFile() {
 function save(db) { if (!USE_DB) fs.writeFileSync(STORE, JSON.stringify(db, null, 2)); }
 let db = loadFile();
 
+const FLOW_LAYOUT_ID = '__flow_layout__'; // the Main Script Flow whiteboard layout is stored as a special row
 async function bootLoad() {
   if (!USE_DB) return;
   try {
-    const rows = await sb(`${SB_TABLE}?select=data&order=updated.desc`);
-    db.conversations = (rows || []).map(r => r.data).filter(Boolean);
+    const rows = await sb(`${SB_TABLE}?select=id,data&order=updated.desc`);
+    db.conversations = (rows || []).filter(r => r.id !== FLOW_LAYOUT_ID).map(r => r.data).filter(Boolean);
     console.log(`[db] loaded ${db.conversations.length} conversations from Supabase`);
   } catch (e) {
     console.error('[db] load failed, starting empty:', e.message);
@@ -562,6 +563,34 @@ app.post('/api/send-sequence', async (req, res) => {
   }
   c.suggestion = null; c.tag = 'replied'; touch(c);
   res.json({ ok: true, steps: done });
+});
+
+// ---------- Main Script Flow whiteboard layout (shared across browsers/setters) ----------
+let flowLayoutMem = null; // in-memory cache + fallback when no DB
+app.get('/api/flow-layout', async (_req, res) => {
+  if (USE_DB) {
+    try {
+      const rows = await sb(`${SB_TABLE}?id=eq.${FLOW_LAYOUT_ID}&select=data`);
+      const layout = rows && rows[0] && rows[0].data && rows[0].data.layout;
+      return res.json({ layout: layout || flowLayoutMem || null });
+    } catch (e) { return res.json({ layout: flowLayoutMem || null }); }
+  }
+  res.json({ layout: flowLayoutMem || null });
+});
+app.post('/api/flow-layout', async (req, res) => {
+  const layout = req.body && req.body.layout;
+  if (!layout || typeof layout !== 'object') return res.status(400).json({ error: 'no layout' });
+  flowLayoutMem = layout;
+  if (USE_DB) {
+    try {
+      await sb(`${SB_TABLE}?on_conflict=id`, {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ id: FLOW_LAYOUT_ID, subscriber_id: '', name: '(flow layout)', updated: Date.now(), data: { layout } }),
+      });
+    } catch (e) { return res.json({ ok: true, mem: true, dbWarn: e.message }); }
+  }
+  res.json({ ok: true });
 });
 
 // 4) hand off to a SAVED ManyChat flow (booking/qualify/etc) — sendFlow
