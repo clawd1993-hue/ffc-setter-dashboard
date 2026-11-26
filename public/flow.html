@@ -247,8 +247,11 @@ function focusNode(id){
   const n=nodeById(id); if(!n)return;
   const board=document.getElementById('board'), h=nodeH(id);
   const cx=n.x+115, cy=n.y+h/2;          // node centre in canvas space (zoom-independent)
-  const z0=zoom, z1=FOCUS_ZOOM, dur=350, t0=performance.now();
-  canvas.style.transition='';             // we drive it manually
+  const z0=zoom, z1=FOCUS_ZOOM;
+  const s0x=board.scrollLeft, s0y=board.scrollTop;          // where we are now
+  const s1x=cx*z1-board.clientWidth/2, s1y=cy*z1-board.clientHeight/2; // where we want to end up
+  const dur=420, t0=performance.now();
+  canvas.style.transition='';             // we drive scale manually
   if(focusAnim) cancelAnimationFrame(focusAnim);
   (function step(now){
     const p=Math.min(1,(now-t0)/dur);
@@ -256,8 +259,8 @@ function focusNode(id){
     zoom=z0+(z1-z0)*e;
     canvas.style.transform='scale('+zoom+')';
     const zl=document.getElementById('zlabel'); if(zl) zl.textContent=Math.round(zoom*100)+'%';
-    board.scrollLeft=cx*zoom-board.clientWidth/2;
-    board.scrollTop =cy*zoom-board.clientHeight/2;
+    board.scrollLeft=s0x+(s1x-s0x)*e;      // glide the scroll in step with the zoom
+    board.scrollTop =s0y+(s1y-s0y)*e;
     if(p<1) focusAnim=requestAnimationFrame(step); else focusAnim=null;
   })(t0);
 }
