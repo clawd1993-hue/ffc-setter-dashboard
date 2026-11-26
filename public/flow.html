@@ -186,8 +186,49 @@ function seed(){
     {from:'hub3', to:'s3_fam',   label:'Family / freedom'},
     {from:'hub3', to:'s3_mon',   label:'Just money'},
     // "just money" surfaces their real why → route it like a why-now (loops back to the hub)
-    {from:'s3_mon', to:'hub3', loop:true, label:'↩ loops back — re-route by their real why'},
+    {from:'s3_mon', to:'hub3', bow:'right', label:'↩ loops back — re-route by their real why'},
   ];
+  // ---- STEP 3 tails → STEP 4 · THE GATE ----
+  nodes.push(
+    {id:'rt_sit', x:1560, y:2240, kind:'route', title:'They answer: working / own / in between?'},
+    {id:'sit_work',    x:1040, y:2520, title:'Situation · Working / job', steps:[
+      {t:'msg', text:"Got it, so this would run alongside the job for now, that's how most people start 💪 And have you ever invested in a course or coaching before to learn this kind of thing?"}]},
+    {id:'sit_own',     x:1520, y:2520, title:'Situation · Own business', steps:[
+      {t:'msg', text:"Nice, so you already think like an owner. That's half the battle. And have you ever invested in a course or coaching before?"}]},
+    {id:'sit_study',   x:2000, y:2520, title:'Situation · Studying', steps:[
+      {t:'msg', text:"Cool! so time's probably on your side, budget maybe less so. And have you ever invested in a course or coaching before?"}]},
+    {id:'sit_between', x:2480, y:2520, title:'Situation · In between / laid off', steps:[
+      {t:'msg', text:"Got it. So this could actually be the thing you build into, not just on the side. And have you ever invested in a course or coaching before?"}]},
+    {id:'rt_inv', x:1560, y:2980, kind:'route', title:'They answer: invested in a course/coaching before?'},
+    {id:'inv_yes',   x:1040, y:3260, title:'Invested · Yes, it helped', steps:[
+      {t:'msg', text:'Nice, so you already know investing in the right help speeds things up.'}]},
+    {id:'inv_no',    x:1560, y:3260, title:'Invested · No / never', steps:[
+      {t:'msg', text:'Okay, so this is the first time you\'re taking it seriously. (makes sense to be cautious then)'}]},
+    {id:'inv_tried', x:2080, y:3260, title:'Invested · Tried, didn\'t follow through', steps:[
+      {t:'msg', text:"So you've already put in effort and it didn't pay off, and it wasn't the info, it was doing it alone that got [their word]. That's actually the exact person this works best for."}]},
+    {id:'gate', x:1500, y:3700, title:'STEP 4 · THE GATE (every lead, before ANY link)', steps:[
+      {t:'msg', text:'If we walked you through how our team can shortcut all this for you, and it felt like the right fit, are you in a position to invest in that right now, or would it be more of a future thing?'}]},
+  );
+  edges.push(
+    // money + family asked the situation question → converge to the situation route
+    {from:'s3_money', to:'rt_sit'}, {from:'s3_fam', to:'rt_sit'},
+    // situation route fans out to the 4 replies
+    {from:'rt_sit', to:'sit_work',    label:'Working / job'},
+    {from:'rt_sit', to:'sit_own',     label:'Own business'},
+    {from:'rt_sit', to:'sit_study',   label:'Studying'},
+    {from:'rt_sit', to:'sit_between', label:'In between / laid off'},
+    // every situation reply asks the invested question → converge to the invested route
+    {from:'sit_work', to:'rt_inv'}, {from:'sit_own', to:'rt_inv'},
+    {from:'sit_study', to:'rt_inv'}, {from:'sit_between', to:'rt_inv'},
+    // job-stress branch asked the invested question directly (skips situation) → swing left into the invested route
+    {from:'s3_job', to:'rt_inv', bow:'left', bowAmt:520, label:'(asked invested already)'},
+    // invested route fans out to the 3 outcomes
+    {from:'rt_inv', to:'inv_yes',   label:'Yes, it helped'},
+    {from:'rt_inv', to:'inv_no',    label:'No / never'},
+    {from:'rt_inv', to:'inv_tried', label:"Tried, didn't follow through"},
+    // all 3 outcomes → STEP 4 · THE GATE
+    {from:'inv_yes', to:'gate'}, {from:'inv_no', to:'gate'}, {from:'inv_tried', to:'gate'},
+  );
   uid=4;
   renderNodes(); drawWires();
 }
@@ -237,12 +278,12 @@ function drawWires(){
   edges.forEach((e,i)=>{
     const a=nodeById(e.from), b=nodeById(e.to); if(!a||!b)return;
     let A,B,dStr,lx,ly;
-    if(e.loop){
-      // loop-back: exit the RIGHT side, bow out to the right, re-enter the target's right side
-      const hA=nodeH(a.id), hB=nodeH(b.id), bow=300;
-      A={x:a.x+230, y:a.y+hA/2}; B={x:b.x+230, y:b.y+hB/2};
-      dStr=`M ${A.x} ${A.y} C ${A.x+bow} ${A.y}, ${B.x+bow} ${B.y}, ${B.x} ${B.y}`;
-      lx=Math.max(A.x,B.x)+bow*0.6; ly=(A.y+B.y)/2;
+    if(e.bow){ // side-swing: exit one side, bow out horizontally, re-enter the same side of the target
+      const dir=e.bow==='left'?-1:1, amt=e.bowAmt||300;
+      const hA=nodeH(a.id), hB=nodeH(b.id);
+      A={x:a.x+(dir<0?0:230), y:a.y+hA/2}; B={x:b.x+(dir<0?0:230), y:b.y+hB/2};
+      dStr=`M ${A.x} ${A.y} C ${A.x+dir*amt} ${A.y}, ${B.x+dir*amt} ${B.y}, ${B.x} ${B.y}`;
+      lx=(dir<0?Math.min(A.x,B.x):Math.max(A.x,B.x))+dir*amt*0.6; ly=(A.y+B.y)/2;
     } else {
       A=centerOut(a); B=centerIn(b); dStr=pathD(A,B);
       lx=(A.x+B.x)/2; ly=(A.y+B.y)/2;
