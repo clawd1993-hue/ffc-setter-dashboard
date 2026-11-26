@@ -67,6 +67,7 @@
     <button class="btn" onclick="setZoom(zoom+0.1)">+</button>
     <button class="btn" onclick="fitAll()">Fit</button>
     <button class="btn" onclick="resetView()">Reset view</button>
+    <button class="btn" onclick="resetLayout()" title="Clear your saved drags, back to default layout">Reset layout</button>
     <button class="btn primary" onclick="addNode()">+ Add bubble</button>
   </div>
 
@@ -258,7 +259,25 @@ function seed(){
     {from:'ack_work', to:'gate'}, {from:'ack_own', to:'gate'}, {from:'ack_study', to:'gate'}, {from:'ack_between', to:'gate'},
   ];
   uid=4;
+  applySavedPositions();   // overlay any positions you've dragged (saved in this browser)
   renderNodes(); drawWires();
+}
+
+// ---- layout persistence (your drags auto-save to this browser; content/edges stay code-driven) ----
+function savePositions(){
+  const m={}; nodes.forEach(n=>{ m[n.id]={x:n.x,y:n.y}; });
+  try{ localStorage.setItem('flowPos', JSON.stringify(m)); }catch(e){}
+}
+function applySavedPositions(){
+  try{
+    const m=JSON.parse(localStorage.getItem('flowPos')||'{}');
+    nodes.forEach(n=>{ if(m[n.id]){ n.x=m[n.id].x; n.y=m[n.id].y; } });
+  }catch(e){}
+}
+function resetLayout(){
+  if(confirm('Reset all bubbles back to the default layout? (your dragged positions will be cleared)')){
+    localStorage.removeItem('flowPos'); location.reload();
+  }
 }
 
 function nodeById(id){return nodes.find(n=>n.id===id);}
@@ -429,6 +448,7 @@ document.addEventListener('pointerup',ev=>{
     const moved=Math.hypot(ev.clientX-drag.sx, ev.clientY-drag.sy)>5;
     const id=drag.id; drag=null;
     if(!moved) focusNode(id); // a plain click (no drag) → zoom+center this bubble
+    else savePositions();     // a real drag → auto-save the layout
   }
   if(link){
     const over=document.elementFromPoint(ev.clientX,ev.clientY);
