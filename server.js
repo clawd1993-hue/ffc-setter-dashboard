@@ -376,7 +376,7 @@ function statusOf(c) {
 }
 app.get('/api/conversations', (_req, res) =>
   // display name = real GHL checkout name whenever we have it; TG name / "Lead 1234" is only a fallback
-  res.json(db.conversations.map(c => ({ id: c.id, name: c.realName || c.name, handle: c.handle, channel: c.channel, avatarColor: c.avatarColor, mode: c.mode, tag: statusOf(c), closed: !!c.closed, updated: c.updated, preview: (c.messages.at(-1) || {}).text || '' }))));
+  res.json(db.conversations.map(c => ({ id: c.id, name: c.realName || c.name, handle: c.handle, channel: c.channel, avatarColor: c.avatarColor, mode: c.mode, tag: statusOf(c), closed: !!c.closed, callBooked: !!c.callBooked, updated: c.updated, preview: (c.messages.at(-1) || {}).text || '' }))));
 
 app.get('/api/conversation/:id', async (req, res) => {
   const c = convo(req.params.id); if (!c) return res.status(404).json({ error: 'not found' });
@@ -544,6 +544,13 @@ app.post('/api/close', (req, res) => {
   const { id, closed } = req.body; const c = convo(id); if (!c) return res.status(404).json({ error: 'not found' });
   c.closed = closed === false ? false : true; touch(c);
   res.json({ ok: true, closed: c.closed });
+});
+
+// mark a lead as Call Booked → drops them in the Call Booked bucket (pass {booked:false} to undo)
+app.post('/api/call-booked', (req, res) => {
+  const { id, booked } = req.body; const c = convo(id); if (!c) return res.status(404).json({ error: 'not found' });
+  c.callBooked = booked === false ? false : true; touch(c);
+  res.json({ ok: true, callBooked: c.callBooked });
 });
 
 // hard-delete a conversation (test cleanup) — removes from memory + Supabase + unlinks tgId

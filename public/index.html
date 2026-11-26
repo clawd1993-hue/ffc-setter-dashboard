@@ -23,8 +23,14 @@
   .tab.email.on{background:#B8860B;color:#fff;}
   .tab.closedtab{color:var(--muted);}
   .tab.closedtab.on{background:#65676B;color:#fff;}
-  .close-lead{background:#fff;border:1px solid #F3C2BC;color:#D93025;margin-left:12px;padding:6px 12px;}
+  .close-lead{background:#fff;border:1px solid #F3C2BC;color:#D93025;margin-left:8px;padding:6px 12px;}
   .close-lead:hover{background:#FDECEA;}
+  .booked-lead{background:#fff;border:1px solid #A7E3C0;color:#1E7A46;margin-left:12px;padding:6px 12px;}
+  .booked-lead:hover{background:#E9F8EF;}
+  .btn.booked-confirm{background:#1E7A46;color:#fff;}
+  .btn.booked-confirm:hover{background:#176137;}
+  .tab.bookedtab{color:#1E7A46;}
+  .tab.bookedtab.on{background:#1E7A46;color:#fff;}
   .reopen-lead{background:#fff;border:1px solid var(--line);color:var(--muted);margin-left:12px;padding:6px 12px;}
   .reopen-lead:hover{background:var(--bg);color:var(--text);}
   .modal-sub{padding:0 22px;font-size:13px;color:var(--muted);line-height:1.5;}
@@ -195,6 +201,17 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="bookedModal">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">Mark as Call Booked?</div>
+      <div class="modal-sub">Are you sure you want to mark <b id="booked-name">this lead</b> as <b>Call Booked</b>? They'll move to the <b>Call Booked</b> list. You can un-book anytime.</div>
+      <div class="modal-foot">
+        <button class="btn ghost" onclick="closeBookedModal()">Cancel</button>
+        <button class="btn booked-confirm" onclick="confirmCallBooked()">📞 Call Booked</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="flowModal">
     <div class="modal" role="dialog" aria-modal="true">
       <div class="modal-head">⚡ Fire automation?</div>
@@ -209,7 +226,7 @@
 <script>
 let LIST=[], CUR=null, FILTER='', TAB='all';
 const TABS=[['all','All'],['review','Needs review'],['replied','Replied'],
-  ['fu1','FU1'],['fu2','FU2'],['fu3','FU3'],['fue1','FUE1'],['fu4','FU4'],['fue2','FUE2'],['fu5','FU5'],['fue3','FUE3'],['closed','Closed']];
+  ['fu1','FU1'],['fu2','FU2'],['fu3','FU3'],['fue1','FUE1'],['fu4','FU4'],['fue2','FUE2'],['fu5','FU5'],['fue3','FUE3'],['callbooked','📞 Call Booked'],['closed','Closed']];
 const tagOf=c=>c.tag||'review';
 function setTab(t){TAB=t;loadList();}
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -218,18 +235,19 @@ const ago=t=>{const s=(Date.now()-t)/1000;if(s<60)return'now';if(s<3600)return M
 async function loadList(){
   LIST=await (await fetch('/api/conversations')).json();
   LIST.sort((a,b)=>b.updated-a.updated);
-  const active=LIST.filter(c=>!c.closed);
+  const active=LIST.filter(c=>!c.closed&&!c.callBooked);
   document.getElementById('count').textContent=active.length;
   const q=FILTER.toLowerCase();
-  // render filter tabs with live counts (closed leads only counted under Closed)
+  // render filter tabs with live counts (closed + call-booked leads pulled out of the active tabs)
   const counts={}; active.forEach(c=>{const t=tagOf(c);counts[t]=(counts[t]||0)+1;});
   counts.closed=LIST.filter(c=>c.closed).length;
+  counts.callbooked=LIST.filter(c=>c.callBooked&&!c.closed).length;
   document.getElementById('tabs').innerHTML=TABS.map(([k,lbl])=>{
     const n=k==='all'?active.length:(counts[k]||0);
-    const cls=k==='closed'?' closedtab':(k.startsWith('fue')?' email':'');
+    const cls=k==='closed'?' closedtab':(k==='callbooked'?' bookedtab':(k.startsWith('fue')?' email':''));
     return `<div class="tab${cls} ${TAB===k?'on':''}" onclick="setTab('${k}')">${lbl}<span class="cnt">${n}</span></div>`;
   }).join('');
-  const matchTab=c=>TAB==='closed'?c.closed:(!c.closed&&(TAB==='all'||tagOf(c)===TAB));
+  const matchTab=c=>TAB==='closed'?c.closed:TAB==='callbooked'?(c.callBooked&&!c.closed):(!c.closed&&!c.callBooked&&(TAB==='all'||tagOf(c)===TAB));
   document.getElementById('convos').innerHTML=LIST.filter(c=>matchTab(c)&&(!q||(c.name+c.preview).toLowerCase().includes(q))).map(c=>`
     <div class="convo ${c.id===CUR?'active':''}" onclick="open_('${c.id}')">
       <div class="avatar" style="background:${c.avatarColor}">${esc((c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2))}</div>
@@ -264,7 +282,10 @@ async function open_(id,keepDraft){
       </div>
       ${c.closed
         ?`<button class="btn reopen-lead" onclick="reopenLead('${c.id}')" title="Move back to the active inbox">↩︎ Reopen</button>`
-        :`<button class="btn close-lead" onclick="askCloseLead('${c.id}','${esc(c.realName||c.name).replace(/'/g,"\\'")}')">Close Lead</button>`}
+        :c.callBooked
+        ?`<button class="btn reopen-lead" onclick="unbookLead('${c.id}')" title="Move back to the active inbox">↩︎ Un-book</button>`
+        :`<button class="btn booked-lead" onclick="askCallBooked('${c.id}','${esc(c.realName||c.name).replace(/'/g,"\\'")}')">📞 Call Booked</button>
+          <button class="btn close-lead" onclick="askCloseLead('${c.id}','${esc(c.realName||c.name).replace(/'/g,"\\'")}')">Close Lead</button>`}
       <div class="mode-toggle" title="Goal: full auto mode (locked for now)">Mode:
         <div class="switch disabled">
           <div class="${c.mode==='approve'?'on':''}">Approve</div>
@@ -424,13 +445,34 @@ async function reopenLead(id){
   await fetch('/api/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,closed:false})});
   open_(id);
 }
+// ---- call booked ----
+let BOOKED_ID=null;
+function askCallBooked(id,name){
+  BOOKED_ID=id;
+  document.getElementById('booked-name').textContent=name||'this lead';
+  document.getElementById('bookedModal').classList.add('show');
+}
+function closeBookedModal(){document.getElementById('bookedModal').classList.remove('show');BOOKED_ID=null;}
+async function confirmCallBooked(){
+  if(!BOOKED_ID)return;
+  const id=BOOKED_ID;
+  await fetch('/api/call-booked',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,booked:true})});
+  closeBookedModal(); CUR=null;
+  document.getElementById('thread').innerHTML='<div class="empty">Call booked — moved to the Call Booked list 📞</div>';
+  loadList();
+}
+async function unbookLead(id){
+  await fetch('/api/call-booked',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,booked:false})});
+  open_(id);
+}
+document.getElementById('bookedModal').addEventListener('click',e=>{if(e.target.id==='bookedModal')closeBookedModal();});
 document.getElementById('closeModal').addEventListener('click',e=>{if(e.target.id==='closeModal')closeCloseModal();});
 document.getElementById('flowModal').addEventListener('click',e=>{if(e.target.id==='flowModal')closeFlowModal();});
 
 // close modal on overlay click or Escape
 document.getElementById('savedModal').addEventListener('click',e=>{if(e.target.id==='savedModal')closeSavedModal();});
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeSavedModal();closeBmModal();closeCloseModal();closeFlowModal();}
+  if(e.key==='Escape'){closeSavedModal();closeBmModal();closeCloseModal();closeBookedModal();closeFlowModal();}
   if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)&&document.getElementById('savedModal').classList.contains('show'))submitSavedModal();
   if(e.key==='Enter'&&document.getElementById('bmModal').classList.contains('show')){e.preventDefault();submitBmModal();}
 });
