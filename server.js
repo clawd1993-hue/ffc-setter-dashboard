@@ -198,6 +198,54 @@ async function suggest(c) {
   }
 }
 
+// ---------- Follow-Up suggestion generator (Phase 1) ----------
+// The lead went quiet after we spoke. Draft the next NUDGE from Michael's proven FU bank,
+// fitting wherever the conversation actually is. Suggestion-only — a setter approves it.
+const FU_BANK = `PRE-BOOKING FOLLOW-UP LADDERS (one a day, escalating). Pick the line that fits where the convo actually is; don't repeat anything already sent.
+
+NEVER REPLIED AT ALL (opening nudges): "[name]?" · "👀" · "I'd like to get a quick picture of where you're at and what you're after, so I can point you in the right direction. Is this your first time building something online, or have you had a go before?"
+
+QUIET AFTER "did you watch the first video?": "👋" · "Quick one before we dive in, step one is the first training video, it's 10 minutes 👇 did you watch it yet?" (resend access link)
+
+QUIET AFTER "why now?": "Just popping back here 😊" · "hey [name], you said you want [their goal, their words]. Is that still the plan or has something changed since we spoke?"
+
+SHARED POOL LINES — each sent ONCE per lead EVER (check the transcript; never reuse one already sent):
+- "Just curious where your head's at. 1 to 10, how serious are you about actually making this happen?"
+- "Real quick, where are you at with this - still looking into it or has it dropped down the list?"
+- "I don't want to keep filling up your inbox, so I'll leave you with one last message 😊 Is there a better time for us to pick this up?"  (the close — only near the end)
+
+BUMPS (no-question pokes): "👋" · "Are you getting my messages? 🙂" — use at most ONCE, only early (FU1/FU2), never twice.
+
+LATE / BREAK-UP: "Hey [name] 👋 how's the challenge going, did you get your first products up yet? And you said [their reason], how's that looking now?"`;
+
+async function generateFuSuggestion(c, step) {
+  if (!ANTHROPIC_API_KEY) { c.fuSuggestion = { text: '(set ANTHROPIC_API_KEY)', step, t: Date.now(), stub: true }; return; }
+  try {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    const transcript = c.messages.map(m => `${m.dir === 'in' ? 'Lead' : 'Setter'}: ${m.text}`).join('\n');
+    const tone = step <= 2 ? 'gentle' : step <= 4 ? 'a bit more direct' : 'a graceful break-up (give them an easy out)';
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-5', max_tokens: 200,
+      system: `You are Paul, an FFC (Faceless Funnel Challenge) DM setter. A lead has gone quiet after we last messaged them — write the NEXT follow-up nudge. This is follow-up #${step}, so tone = ${tone}.
+Rules:
+- Read the transcript: nudge whatever was genuinely the LAST thing we said that they didn't reply to. Never reference an older topic that's since moved on.
+- Prefer a line from the FU bank below that fits. If the convo went off-script and nothing fits, write a short custom nudge in the same warm human style.
+- NEVER reuse a line already sent in the transcript — especially the once-ever pool lines (the "1 to 10", "where are you at", and the "one last message" close).
+- Fill tokens ([name], [their reason], [their goal]) from the transcript; if unknown, drop them naturally.
+- Output ONLY the message text to send. One short message. No preamble, no quotes.
+
+FU BANK:
+${FU_BANK}`,
+      messages: [{ role: 'user', content: `Transcript so far:\n${transcript}\n\nWrite follow-up #${step}.` }],
+    });
+    c.fuSuggestion = { text: msg.content[0].text.trim(), step, t: Date.now() };
+  } catch (e) {
+    c.fuSuggestion = { text: `(FU brain error: ${e.message})`, step, t: Date.now(), stub: true };
+  }
+  touch(c);
+}
+
 // ---------- server ----------
 const app = express();
 app.use(express.json());
@@ -329,6 +377,20 @@ app.get('/api/conversation/:id', async (req, res) => {
   const c = convo(req.params.id); if (!c) return res.status(404).json({ error: 'not found' });
   if (!c.email) await enrichEmail(c); // backfill email on open
   if (!c.realNameV2) await enrichRealName(c); // backfill real checkout name from GHL
+  // Follow-Up suggestion: if this lead is overdue (fu1..fu5) and we spoke last, draft the next
+  // nudge (once per step). Non-blocking — the thread auto-refreshes to pick it up in a few sec.
+  const st = statusOf(c);
+  if (/^fu[1-5]$/.test(st)) {
+    const step = parseInt(st.slice(2), 10);
+    if (!c.fuSuggestion || c.fuSuggestion.step !== step) {
+      if (!c.fuSuggestion || !c.fuSuggestion.pending) {
+        c.fuSuggestion = { text: '', step, pending: true, t: Date.now() };
+        generateFuSuggestion(c, step).catch(() => {}); // fire-and-forget
+      }
+    }
+  } else if (c.fuSuggestion) {
+    delete c.fuSuggestion; // no longer overdue (lead replied etc.) — clear stale draft
+  }
   res.json(c);
 });
 

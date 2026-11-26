@@ -94,6 +94,12 @@
   .ai-suggest{background:var(--blue-soft);border:1px solid #CCE4FF;border-radius:12px;padding:12px 14px;margin-bottom:10px;}
   .ai-suggest .label{font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
   .ai-suggest .txt{font-size:14px;line-height:1.45;}
+  .fu-suggest{background:#FFF4E5;border:1px solid #FFD591;border-radius:12px;padding:12px 14px;margin-bottom:10px;}
+  .fu-suggest .label{font-size:11px;color:#C77700;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+  .fu-suggest .txt{font-size:14px;line-height:1.45;}
+  .fu-suggest .txt.muted{color:var(--muted);font-style:italic;}
+  .btn.fu-send{background:#F5900B;color:#fff;}
+  .btn.fu-send:hover{background:#d97d05;}
   .ai-actions{display:flex;gap:8px;margin-top:10px;}
   .btn{border:none;border-radius:18px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;}
   .btn.send{background:var(--blue);color:#fff;}
@@ -282,6 +288,15 @@ async function open_(id,keepDraft){
         return `<div class="${base}">${esc(m.text)}</div>`;
       }).join('')}</div>
     <div class="compose">
+      ${c.fuSuggestion?`<div class="fu-suggest">
+        <div class="label">⏰ Follow-up suggestion${c.fuSuggestion.step?` · FU${c.fuSuggestion.step}`:''}</div>
+        ${c.fuSuggestion.pending?`<div class="txt muted" id="futxt">✍️ drafting follow-up…</div>`
+          :`<div class="txt" id="futxt">${esc(c.fuSuggestion.text)}</div>
+          <div class="ai-actions">
+            <button class="btn fu-send" onclick="send('${c.id}',document.getElementById('futxt').textContent)">Send ✓</button>
+            <button class="btn ghost" onclick="document.getElementById('reply').value=document.getElementById('futxt').textContent;document.getElementById('reply').focus()">Edit</button>
+          </div>`}
+      </div>`:''}
       ${sug?`<div class="ai-suggest">
         <div class="label">🤖 AI suggested reply · confidence ${Math.round((sug.confidence||0)*100)}%</div>
         <div class="txt" id="sugtxt">${esc(sug.text)}</div>
