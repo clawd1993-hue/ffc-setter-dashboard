@@ -246,7 +246,8 @@ async function open_(id,keepDraft){
   const c=await (await fetch('/api/conversation/'+id)).json();
   // auto-refresh: if no NEW message arrived, don't rebuild the pane at all
   // (prevents scroll jumps, closing the flow menu, and wiping a draft)
-  if(keepDraft&&CUR===id&&window.__msgCount===(c.messages||[]).length){loadList();return;}
+  const msgSig=(c.messages||[]).reduce((a,m)=>a+(m.text||'').length+(m.transcript||'').length,0)+'/'+(c.messages||[]).length;
+  if(keepDraft&&CUR===id&&window.__msgSig===msgSig){loadList();return;}
   const sug=c.suggestion;
   document.getElementById('thread').innerHTML=`
     <div class="thread-head">
@@ -302,7 +303,7 @@ async function open_(id,keepDraft){
       </div>
     </div>`;
   const m=document.getElementById('msgs'); if(m)m.scrollTop=m.scrollHeight;
-  window.__msgCount=(c.messages||[]).length;
+  window.__msgSig=(c.messages||[]).reduce((a,m)=>a+(m.text||'').length+(m.transcript||'').length,0)+'/'+(c.messages||[]).length;
   // restore the draft the human was typing before the refresh
   const r=document.getElementById('reply');
   if(r&&draft){r.value=draft; if(hadFocus){r.focus(); try{r.setSelectionRange(caret,caret);}catch(e){}}}
