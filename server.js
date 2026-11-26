@@ -532,7 +532,11 @@ app.post('/api/send-sequence', async (req, res) => {
   if (!seq.length) return res.status(400).json({ error: 'no steps' });
   if (!SEND_ENABLED) { return res.json({ ok: false, blocked: true, note: 'Sending is OFF (SEND_ENABLED not set). Nothing was sent to the lead.' }); }
   const done = [];
+  const GAP_MS = 3000; // human-like pause between stacked messages/automations
+  let first = true;
   for (const s of seq) {
+    if (!first) await new Promise(r => setTimeout(r, GAP_MS));
+    first = false;
     if (s.type === 'flow' || s.fire) {
       const name = s.name || s.fire;
       const ns = s.flow_ns || flowNsByName(name);
