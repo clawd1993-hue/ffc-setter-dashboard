@@ -200,13 +200,21 @@ function seed(){
     {id:'sit_between', x:2480, y:2520, title:'Situation · In between / laid off', steps:[
       {t:'msg', text:"Got it. So this could actually be the thing you build into, not just on the side. And have you ever invested in a course or coaching before?"}]},
     {id:'rt_inv', x:1560, y:2980, kind:'route', title:'They answer: invested in a course/coaching before?'},
-    {id:'inv_yes',   x:1040, y:3260, title:'Invested · Yes, it helped', steps:[
+    {id:'inv_yes',   x:760,  y:3260, title:'Invested · Yes, it helped', steps:[
       {t:'msg', text:'Nice, so you already know investing in the right help speeds things up.'}]},
-    {id:'inv_no',    x:1560, y:3260, title:'Invested · No / never', steps:[
+    {id:'inv_no',    x:1240, y:3260, title:'Invested · No / never', steps:[
       {t:'msg', text:'Okay, so this is the first time you\'re taking it seriously. (makes sense to be cautious then)'}]},
-    {id:'inv_tried', x:2080, y:3260, title:'Invested · Tried, didn\'t follow through', steps:[
-      {t:'msg', text:"So you've already put in effort and it didn't pay off, and it wasn't the info, it was doing it alone that got [their word]. That's actually the exact person this works best for."}]},
-    {id:'gate', x:1500, y:3700, title:'STEP 4 · THE GATE (every lead, before ANY link)', steps:[
+    {id:'inv_burned', x:1800, y:3260, title:'Invested · Burned / scammed before', steps:[
+      {t:'msg', text:'Ah, sorry to hear that, way more common than people admit. What was missing last time - the info, or the support after you invested?'}]},
+    {id:'inv_triedfail', x:2280, y:3260, title:'Invested · Tried before, nothing worked', steps:[
+      {t:'msg', text:"So you've already put in effort and it didn't pay off, that's actually the exact person this works best for. What was missing last time - the info, or the support after you invested?"}]},
+    // "what was missing?" sub-dig — ONE line + the setup question in the SAME message
+    {id:'rt_miss', x:2040, y:3560, kind:'route', title:'They answer: the info, or the support?'},
+    {id:'miss_support', x:1800, y:3840, title:'What was missing · Support / doing it alone', steps:[
+      {t:'msg', text:"So it wasn't the info, it was doing it alone that got [their word: overwhelming / no one to ask / no follow-through / where it fell apart]. That's actually the exact person this works best for. So what's the setup right now? Working full-time, running something of your own, or in between?"}]},
+    {id:'miss_info', x:2280, y:3840, title:'What was missing · Just the info / roadmap', steps:[
+      {t:'msg', text:"I hear you! so you had the drive, just not the roadmap and guidance. So what's the setup right now? Working full-time, running something of your own, or in between?"}]},
+    {id:'gate', x:1360, y:4300, title:'STEP 4 · THE GATE (every lead, before ANY link)', steps:[
       {t:'msg', text:'If we walked you through how our team can shortcut all this for you, and it felt like the right fit, are you in a position to invest in that right now, or would it be more of a future thing?'}]},
   );
   edges.push(
@@ -222,12 +230,18 @@ function seed(){
     {from:'sit_study', to:'rt_inv'}, {from:'sit_between', to:'rt_inv'},
     // job-stress branch asked the invested question directly (skips situation) → swing left into the invested route
     {from:'s3_job', to:'rt_inv', bow:'left', bowAmt:520, label:'(asked invested already)'},
-    // invested route fans out to the 3 outcomes
-    {from:'rt_inv', to:'inv_yes',   label:'Yes, it helped'},
-    {from:'rt_inv', to:'inv_no',    label:'No / never'},
-    {from:'rt_inv', to:'inv_tried', label:"Tried, didn't follow through"},
-    // all 3 outcomes → STEP 4 · THE GATE
-    {from:'inv_yes', to:'gate'}, {from:'inv_no', to:'gate'}, {from:'inv_tried', to:'gate'},
+    // invested route fans out to the outcomes
+    {from:'rt_inv', to:'inv_yes',       label:'Yes, it helped'},
+    {from:'rt_inv', to:'inv_no',        label:'No / never'},
+    {from:'rt_inv', to:'inv_burned',    label:'Burned / scammed'},
+    {from:'rt_inv', to:'inv_triedfail', label:'Tried, nothing worked'},
+    // burned + tried-nothing-worked both ask "what was missing?" → converge
+    {from:'inv_burned', to:'rt_miss'}, {from:'inv_triedfail', to:'rt_miss'},
+    {from:'rt_miss', to:'miss_support', label:'Support / doing it alone'},
+    {from:'rt_miss', to:'miss_info',    label:'Just the info'},
+    // yes/no go straight to the Gate; the "what was missing" bubbles ask the setup Q then → Gate
+    {from:'inv_yes', to:'gate'}, {from:'inv_no', to:'gate'},
+    {from:'miss_support', to:'gate'}, {from:'miss_info', to:'gate'},
   );
   uid=4;
   renderNodes(); drawWires();
