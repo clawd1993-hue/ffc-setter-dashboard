@@ -242,6 +242,53 @@ function seed(){
     {id:'red1', x:2860, y:4160, title:'🔴 RED · downsell to the challenge (no call/proof/link)', steps:[
       {t:'msg', text:"No worries, I understand 🙏 Then the right move right now is the challenge, not Elite. You've got the training and products, you can get first sales on your own, I'm here to answer questions. When you're in a better position to go full force, reach back and we'll set up the call. I'll check in with you on [date] 🙌"}]},
     {id:'red_note', x:2860, y:4620, kind:'route', title:'→ cancel Calendly · tag UQ-red · check-in date 2–4 weeks out'},
+
+    // ===== YELLOW · shared tail (every type converges here) =====
+    {id:'proof_prop', x:1200, y:5500, title:'🟡 PROOF + PROPOSAL (every type lands here)', steps:[
+      {t:'flow', name:'Proof'},
+      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+    {id:'rt_spot', x:1200, y:5820, kind:'route', title:'They say YES to a spot?'},
+    {id:'y_book', x:850, y:6120, title:'➡️ Book the call', steps:[
+      {t:'msg',  text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'flow', name:'Booking Link'}]},
+    {id:'y_no', x:1560, y:6120, title:'🟡 Said NO (now it\'s the investment)', steps:[
+      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+    {id:'rt_nono', x:1560, y:6420, kind:'route', title:'Their answer?'},
+    {id:'y_nurture', x:1560, y:6700, title:'🟡 Nurture-yellow + check-in date', steps:[
+      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+
+    // ===== 2a · Price (has income) sub-branches =====
+    {id:'rt_2a', x:320, y:5200, kind:'route', title:'Their answer?'},
+    {id:'y_2a_maybe', x:120, y:5480, title:'🟡 2a · Maybe / not yet', steps:[
+      {t:'msg', text:'Fair enough 🙂 And what would need to be true for this to be a yes for you?'}]},
+    {id:'y_2a_side', x:460, y:5480, title:'🟡 2a · "too expensive" (no number given yet)', steps:[
+      {t:'msg', text:'What are you comparing it to? [answer the exact thing in their words: we build the site, load the products and set up the first ad — no tech for you — and structure the investment part around your first sales; Salomé covers the detail on the call]'}]},
+
+    // ===== 2b · Price (no income) — 3-msg ladder =====
+    {id:'rt_2b1', x:800, y:5200, kind:'route', title:'Their answer?'},
+    {id:'y_2b_msg2', x:800, y:5480, title:'🟡 2b · msg2 (packages + proof + ask)', steps:[
+      {t:'msg',  text:"The packages depend on where you're at — the Head Coach covers that on the call."},
+      {t:'flow', name:'Proof'},
+      {t:'msg',  text:'Want me to grab you a spot with her this week?'}]},
+    {id:'rt_2b2', x:800, y:5760, kind:'route', title:'Yes to a spot?'},
+    {id:'y_2b_msg3', x:800, y:6020, title:'🟡 2b · msg3 (last question)', steps:[
+      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+    {id:'rt_2b3', x:800, y:6300, kind:'route', title:'Their answer?'},
+
+    // ===== 2c · Fit / doubt sub-branches =====
+    {id:'rt_2c', x:1300, y:5180, kind:'route', title:'What would make it a yes?'},
+    {id:'y_2c_guar', x:1120, y:5460, title:'🟡 2c · Wants a guarantee', steps:[
+      {t:'msg', text:"No one can guarantee results — what we guarantee is the setup: we build it with you. It's like the gym, I'm the trainer, I can't grow the muscles for you, but I make sure you're doing the right things."}]},
+    {id:'y_2c_price', x:1460, y:5460, title:'🟡 2c · Asks the price', steps:[
+      {t:'msg', text:'Different packages depending where you\'re at — the Head Coach covers that on the call. [then re-ask the question they interrupted]'}]},
+    {id:'y_2c_call', x:1290, y:5720, title:'🟡 2c · Wants to see inside / talk to someone', steps:[
+      {t:'msg', text:"That's exactly what the call is for — you'll see inside and talk it through with the Head Coach."}]},
+
+    // ===== 2f · Authority / partner sub-branches =====
+    {id:'rt_2f', x:2660, y:5180, kind:'route', title:'Their answer?'},
+    {id:'y_2f_both', x:2660, y:5460, title:'🟡 2f · "I\'d recommend it" → both on the call', steps:[
+      {t:'msg', text:"Perfect — then let's get you both on the call so you're aligned. Monday or Tuesday?"}]},
+    {id:'rt_2f_yes', x:2660, y:5740, kind:'route', title:'Yes?'},
   );
   edges=[
     {from:'n1', to:'n2', label:'Beginner / first look'},
@@ -307,6 +354,51 @@ function seed(){
     {from:'rt_yellow', to:'y_2f', label:'Talk to partner'},
     // Red
     {from:'red1', to:'red_note'},
+
+    // ---- Yellow deep handling ----
+    // shared tail
+    {from:'proof_prop', to:'rt_spot'},
+    {from:'rt_spot', to:'y_book', label:'Yes'},
+    {from:'rt_spot', to:'y_no',   label:'No'},
+    {from:'y_no', to:'rt_nono'},
+    {from:'rt_nono', to:'y_book',    label:'Yes'},
+    {from:'rt_nono', to:'y_nurture', label:'No / unsure'},
+    // 2a
+    {from:'y_2a', to:'rt_2a'},
+    {from:'rt_2a', to:'proof_prop',  label:'Yes'},
+    {from:'rt_2a', to:'y_2a_maybe',  label:'Maybe / not yet'},
+    {from:'y_2a_maybe', to:'proof_prop'},
+    {from:'y_2a', to:'y_2a_side', label:'too expensive (no number)'},
+    {from:'y_2a_side', to:'proof_prop'},
+    // 2b
+    {from:'y_2b', to:'rt_2b1'},
+    {from:'rt_2b1', to:'proof_prop', label:'value first'},
+    {from:'rt_2b1', to:'y_2b_msg2',  label:'only the investment'},
+    {from:'y_2b_msg2', to:'rt_2b2'},
+    {from:'rt_2b2', to:'y_book',    label:'yes'},
+    {from:'rt_2b2', to:'y_2b_msg3', label:'no'},
+    {from:'y_2b_msg3', to:'rt_2b3'},
+    {from:'rt_2b3', to:'y_book', label:'clear yes'},
+    {from:'rt_2b3', to:'y_2c',   label:"no/maybe → it's not the money"},
+    {from:'rt_2b3', to:'red1',   label:'hard no'},
+    // 2c
+    {from:'y_2c', to:'rt_2c'},
+    {from:'rt_2c', to:'proof_prop',  label:'results / dodges'},
+    {from:'rt_2c', to:'y_2c_guar',   label:'guarantee'},
+    {from:'rt_2c', to:'y_2c_price',  label:'asks price'},
+    {from:'rt_2c', to:'y_2c_call',   label:'see inside / talk to someone'},
+    {from:'y_2c_guar', to:'proof_prop'},
+    {from:'y_2c_price', to:'proof_prop'},
+    {from:'y_2c_call', to:'proof_prop'},
+    // 2d / 2e → straight to proof+proposal
+    {from:'y_2d', to:'proof_prop'},
+    {from:'y_2e', to:'proof_prop'},
+    // 2f
+    {from:'y_2f', to:'rt_2f'},
+    {from:'rt_2f', to:'y_2f_both', label:"I'd recommend it"},
+    {from:'rt_2f', to:'y_2c',      label:'doubts myself'},
+    {from:'y_2f_both', to:'rt_2f_yes'},
+    {from:'rt_2f_yes', to:'y_book', label:'yes'},
   ];
   uid=4;
   applySavedPositions();   // overlay any positions you've dragged (saved in this browser)
