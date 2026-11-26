@@ -288,7 +288,9 @@ app.post('/manychat/mirror', (req, res) => {
   // dedupe: ignore identical dir+text within 15s (ManyChat can retry External Requests)
   const last = c.messages.at(-1);
   if (last && last.dir === dir && last.text === text && Date.now() - last.t < 15000) return res.json(MC_OK);
-  c.messages.push({ dir, text, t: Date.now(), mirror: true });
+  // mirrored automation narration (e.g. the Welcome flow) is NOT a human setter reply —
+  // keep the convo in "Needs review" so a setter still picks it up. A real /api/send flips it.
+  c.messages.push({ dir, text, t: Date.now(), mirror: true, forceReview: true });
   if (dir === 'in' && pickv('email')) c.email = c.email || pickv('email');
   touch(c);
   res.json(MC_OK);
@@ -302,6 +304,7 @@ function statusOf(c) {
   if (PIPE_TAGS.includes(c.tag)) return c.tag;     // a follow-up stage was explicitly set
   const last = c.messages && c.messages.at(-1);
   if (!last) return 'review';
+  if (last.forceReview) return 'review';           // last was automation narration (Welcome mirror), not a human reply
   if (last.dir === 'out') return 'replied';        // we spoke last
   // last is inbound. Normally = review, UNLESS a setter manually marked it replied
   // AFTER that inbound (used when ManyChat isn't synced). Auto-reverts: any NEW inbound
