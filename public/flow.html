@@ -239,13 +239,27 @@ function scrollToNode(id){
     behavior:'smooth'
   });
 }
-// click a bubble / label → zoom to a focused level AND smooth-scroll it into the center
+// click a bubble / label → zoom to a focused level AND glide it into the center.
+// zoom + scroll are animated TOGETHER each frame (node stays centered throughout = no jump).
 const FOCUS_ZOOM=1;
+let focusAnim=null;
 function focusNode(id){
-  canvas.style.transition='transform .35s ease';   // animate the scale just for this focus
-  setZoom(FOCUS_ZOOM);
-  scrollToNode(id);
-  setTimeout(()=>{canvas.style.transition='';},400); // clear so pinch-zoom stays snappy
+  const n=nodeById(id); if(!n)return;
+  const board=document.getElementById('board'), h=nodeH(id);
+  const cx=n.x+115, cy=n.y+h/2;          // node centre in canvas space (zoom-independent)
+  const z0=zoom, z1=FOCUS_ZOOM, dur=350, t0=performance.now();
+  canvas.style.transition='';             // we drive it manually
+  if(focusAnim) cancelAnimationFrame(focusAnim);
+  (function step(now){
+    const p=Math.min(1,(now-t0)/dur);
+    const e=p<0.5?2*p*p:1-Math.pow(-2*p+2,2)/2; // easeInOut
+    zoom=z0+(z1-z0)*e;
+    canvas.style.transform='scale('+zoom+')';
+    const zl=document.getElementById('zlabel'); if(zl) zl.textContent=Math.round(zoom*100)+'%';
+    board.scrollLeft=cx*zoom-board.clientWidth/2;
+    board.scrollTop =cy*zoom-board.clientHeight/2;
+    if(p<1) focusAnim=requestAnimationFrame(step); else focusAnim=null;
+  })(t0);
 }
 function editEdge(i){
   const e=edges[i]; if(!e)return;
