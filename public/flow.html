@@ -38,6 +38,11 @@
   .node .dot{width:9px;height:9px;border-radius:50%;background:var(--blue);flex:0 0 auto;}
   .node .title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
   .node .body{padding:11px 12px 13px;font-size:14px;line-height:1.4;color:var(--ink);}
+  .stepflow{background:#EAF3FF;border:1px solid #BFDBFF;color:#1B63C4;border-radius:8px;padding:6px 9px;
+    font-size:12px;font-weight:700;margin-bottom:7px;}
+  .stepmsg{background:#F7F9FB;border:1px solid #EAEEF2;border-radius:8px;padding:7px 9px;font-size:13px;
+    line-height:1.38;margin-bottom:7px;}
+  .stepflow:last-child,.stepmsg:last-child{margin-bottom:0;}
   /* connector handles */
   .port{position:absolute;width:15px;height:15px;border-radius:50%;background:#fff;border:2px solid var(--arrow);
     left:50%;transform:translateX(-50%);cursor:crosshair;transition:border-color .12s,background .12s;}
@@ -77,13 +82,27 @@ let nodes=[], edges=[], uid=1;
 
 // ---- seed: 3 dummy bubbles chained top → bottom ----
 function seed(){
-  // a TREE that splits: parent on top → two branches below
+  // STEP 1 of the main script, mapped. A batch (fire VN → then message) is ONE bubble.
   nodes=[
-    {id:'n1', x:1700, y:120, title:'Start',   text:'Parent bubble — the question.'},
-    {id:'n2', x:1480, y:420, title:'Branch A', text:'If YES → go here.'},
-    {id:'n3', x:1920, y:420, title:'Branch B', text:'If NO → go here.'},
+    {id:'n1', x:1680, y:90, title:'STEP 1 · Opener', steps:[
+      {t:'flow', name:'Welcome VN'},
+      {t:'msg',  text:'Quick one before we dive in, have you tried building something online before, or is this your first real look into it?'},
+    ]},
+    {id:'n2', x:1340, y:470, title:'Bridge · Beginner', steps:[
+      {t:'msg',  text:"Sure, no worries then — you're exactly who this was built for. Most of our best students started from zero."},
+      {t:'flow', name:'What is FFC'},
+      {t:'msg',  text:'So have you had a chance to watch the first video of the training yet?'},
+    ]},
+    {id:'n3', x:2020, y:470, title:'Bridge · Tried before', steps:[
+      {t:'msg',  text:'Ah nice, so you already know the game. The part most people get stuck on is the offer, not the tech.'},
+      {t:'flow', name:'What is FFC'},
+      {t:'msg',  text:'So have you had a chance to watch the first video of the training yet?'},
+    ]},
   ];
-  edges=[{from:'n1',to:'n2',label:'Yes'},{from:'n1',to:'n3',label:'No'}];
+  edges=[
+    {from:'n1', to:'n2', label:'Beginner / first look'},
+    {from:'n1', to:'n3', label:'Tried before'},
+  ];
   uid=4;
   renderNodes(); drawWires();
 }
@@ -97,10 +116,14 @@ function renderNodes(){
     const el=document.createElement('div');
     el.className='node'; el.dataset.id=n.id;
     el.style.left=n.x+'px'; el.style.top=n.y+'px';
+    const steps=n.steps||[{t:'msg',text:n.text||''}];
+    const body=steps.map(s=> s.t==='flow'
+      ? `<div class="stepflow">⚡ ${esc(s.name)}</div>`
+      : `<div class="stepmsg">${esc(s.text)}</div>`).join('');
     el.innerHTML=`
       <div class="port in" data-port="in"></div>
       <div class="head"><span class="dot"></span><span class="title">${esc(n.title)}</span></div>
-      <div class="body">${esc(n.text)}</div>
+      <div class="body">${body}</div>
       <div class="port out" data-port="out"></div>`;
     canvas.appendChild(el);
   });
@@ -201,7 +224,7 @@ document.addEventListener('pointerup',ev=>{
       // dropped on empty canvas → SPAWN a new branch bubble here and connect
       const pt=toCanvas(ev.clientX,ev.clientY);
       const id='n'+(uid++);
-      nodes.push({id, x:pt.x-115, y:pt.y-10, title:'Bubble '+(uid-1), text:'New message bubble.'});
+      nodes.push({id, x:pt.x-115, y:pt.y-10, title:'New bubble', steps:[{t:'msg',text:'New message bubble.'}]});
       edges.push({from:link.from,to:id});
       renderNodes();
     }
@@ -218,12 +241,14 @@ function toCanvas(cx,cy){
 function addNode(){
   const id='n'+(uid++);
   const board=document.getElementById('board');
-  nodes.push({id, x:board.scrollLeft+500, y:board.scrollTop+160, title:'Bubble '+(uid-1), text:'New message bubble.'});
+  nodes.push({id, x:board.scrollLeft+500, y:board.scrollTop+160, title:'New bubble', steps:[{t:'msg',text:'New message bubble.'}]});
   renderNodes(); drawWires();
 }
 function resetView(){
   const board=document.getElementById('board');
-  board.scrollTo({left:1550,top:0,behavior:'smooth'});
+  // center the top node horizontally
+  const left=1795-board.clientWidth/2;
+  board.scrollTo({left:Math.max(0,left),top:0,behavior:'smooth'});
 }
 
 seed();
