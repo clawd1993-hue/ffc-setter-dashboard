@@ -983,12 +983,12 @@ function addNode(){
   savePositions();
 }
 function addButton(){
-  const label=prompt('Button text (what the lead taps). Leave blank for a plain button:','');
+  const label=prompt('Button / junction label (e.g. "Their answer?", "Yes to a spot?"):','');
   if(label===null) return;
-  const id='btn'+(uid++);
+  const id='rt'+(uid++);
   const board=document.getElementById('board');
   const x=(board.scrollLeft+500)/zoom, y=(board.scrollTop+220)/zoom;
-  nodes.push({id, x, y, kind:'button', text:label.trim()||'Button', _added:true});
+  nodes.push({id, x, y, kind:'route', title:label.trim()||'Their answer?', _added:true});
   renderNodes(); drawWires(); try{ wireInteractions(); }catch(e){}
   savePositions();
 }
