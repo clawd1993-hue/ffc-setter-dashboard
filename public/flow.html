@@ -44,6 +44,12 @@
   .stepmsg{background:#F7F9FB;border:1px solid #EAEEF2;border-radius:8px;padding:7px 9px;font-size:13px;
     line-height:1.38;margin-bottom:7px;}
   .stepflow:last-child,.stepmsg:last-child{margin-bottom:0;}
+  /* reviewed = logic checked & done */
+  .node.reviewed{background:#E7F7EC;border-color:#A7E0BA;}
+  .rev-toggle{position:absolute;top:7px;right:8px;width:18px;height:18px;border-radius:50%;border:1.5px solid #CBD5E0;
+    background:#fff;color:#CBD5E0;font-size:11px;font-weight:800;line-height:15px;text-align:center;cursor:pointer;user-select:none;z-index:3;}
+  .rev-toggle:hover{border-color:#2BB667;color:#2BB667;}
+  .node.reviewed .rev-toggle{background:#2BB667;border-color:#2BB667;color:#fff;}
   /* route pill — a junction, not a message bubble */
   .node.route{width:230px;background:#EDF1F6;border:1px solid #CFD8E2;border-radius:24px;box-shadow:0 1px 3px rgba(20,40,70,.06);}
   .node.route .routelabel{padding:11px 18px;text-align:center;font-size:13px;font-weight:700;color:#5A6B7D;}
@@ -495,7 +501,8 @@ let SAVED_LAYOUT=null, saveTimer=null;
 function currentLayout(){
   const pos={}; nodes.forEach(n=>{ pos[n.id]={x:n.x,y:n.y}; });
   const mids={}; edges.forEach(e=>{ if(e.mid) mids[e.from+'>'+e.to]={x:e.mid.x,y:e.mid.y}; });
-  return {pos,mids};
+  const reviewed=nodes.filter(n=>n.reviewed).map(n=>n.id);
+  return {pos,mids,reviewed};
 }
 function savePositions(){
   const layout=currentLayout();
@@ -508,6 +515,7 @@ function applyLayout(layout){
   const pos=layout.pos||layout, mids=layout.mids||{}; // backward-compat
   nodes.forEach(n=>{ if(pos[n.id]){ n.x=pos[n.id].x; n.y=pos[n.id].y; } });
   edges.forEach(e=>{ const k=e.from+'>'+e.to; if(mids[k]) e.mid=mids[k]; });
+  const rev=layout.reviewed||[]; if(rev.length){ const set=new Set(rev); nodes.forEach(n=>{ n.reviewed=set.has(n.id); }); }
 }
 function applySavedPositions(){ applyLayout(SAVED_LAYOUT); }
 function resetLayout(){
@@ -526,9 +534,11 @@ function renderNodes(){
     const el=document.createElement('div');
     el.className='node'; el.dataset.id=n.id;
     el.style.left=n.x+'px'; el.style.top=n.y+'px';
+    const revBtn=`<div class="rev-toggle" title="Mark reviewed / done">✓</div>`;
     if(n.kind==='route'){
       el.className='node route';
       el.innerHTML=`
+        ${revBtn}
         <div class="port in" data-port="in"></div>
         <div class="routelabel">${esc(n.title)}</div>
         <div class="port out" data-port="out"></div>`;
@@ -538,11 +548,13 @@ function renderNodes(){
         ? `<div class="stepflow">⚡ ${esc(s.name)}</div>`
         : `<div class="stepmsg">${esc(s.text)}</div>`).join('');
       el.innerHTML=`
+        ${revBtn}
         <div class="port in" data-port="in"></div>
         <div class="head"><span class="dot"></span><span class="title">${esc(n.title)}</span></div>
         <div class="body">${body}</div>
         <div class="port out" data-port="out"></div>`;
     }
+    if(n.reviewed) el.classList.add('reviewed');
     canvas.appendChild(el);
   });
   try{ wireInteractions(); }catch(err){ console.error('wireInteractions failed:', err); } // never let this block drawWires
@@ -651,8 +663,20 @@ let drag=null, link=null, tempPath=null, labelDrag=null;
 function wireInteractions(){
   canvas.querySelectorAll('.node').forEach(el=>{
     const id=el.dataset.id;
+    const rev=el.querySelector('.rev-toggle');
+    if(rev){
+      rev.addEventListener('pointerdown',ev=>ev.stopPropagation()); // don't start a drag
+      rev.addEventListener('click',ev=>{
+        ev.stopPropagation();
+        const n=nodeById(id); if(!n) return;
+        n.reviewed=!n.reviewed;
+        el.classList.toggle('reviewed', n.reviewed);
+        savePositions(); // persists reviewed[] in the shared layout
+      });
+    }
     el.addEventListener('pointerdown',ev=>{
       if(ev.target.classList.contains('port')) return; // handled below
+      if(ev.target.classList.contains('rev-toggle')) return; // review toggle, not a drag
       const n=nodeById(id); const p=toCanvas(ev.clientX,ev.clientY);
       drag={id,dx:p.x-n.x,dy:p.y-n.y,el,sx:ev.clientX,sy:ev.clientY};
       el.classList.add('drag'); el.setPointerCapture(ev.pointerId);
