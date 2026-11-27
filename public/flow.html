@@ -709,7 +709,6 @@ function applyLayout(layout){
   if(!layout) return;
   const pos=layout.pos||layout, mids=layout.mids||{}; // backward-compat
   nodes.forEach(n=>{ if(pos[n.id]){ n.x=pos[n.id].x; n.y=pos[n.id].y; } });
-  const rev=layout.reviewed||[]; if(rev.length){ const set=new Set(rev); nodes.forEach(n=>{ n.reviewed=set.has(n.id); }); }
   if(Array.isArray(layout.rules)){ hardRules=layout.rules.slice(); renderRules(); }
   // re-add user-created blocks first (edges may reference them)
   (layout.addedNodes||[]).forEach(n=>{ if(!nodeById(n.id)){ n._added=true; nodes.push(n); } });
@@ -725,6 +724,8 @@ function applyLayout(layout){
   if(layout.edgeLabels){ Object.keys(layout.edgeLabels).forEach(k=>{ const p=k.split('>'); const e=edges.find(e=>e.from===p[0]&&e.to===p[1]); if(e){ e.label=layout.edgeLabels[k]; e._labelEdited=true; } }); }
   // apply arrow-bend waypoints LAST — after added edges exist, so bends on new arrows restore too
   edges.forEach(e=>{ const k=e.from+'>'+e.to; if(mids[k]) e.mid={x:mids[k].x,y:mids[k].y}; });
+  // apply reviewed state LAST too — after added nodes exist, so their green ✓ restores
+  { const set=new Set(layout.reviewed||[]); nodes.forEach(n=>{ n.reviewed=set.has(n.id); }); }
   if(layout.edits && typeof layout.edits==='object'){
     textEdits=layout.edits;
     Object.keys(textEdits).forEach(id=>{ const n=nodeById(id); if(!n) return; const st=ensureSteps(n);
