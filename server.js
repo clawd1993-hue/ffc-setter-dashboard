@@ -568,6 +568,7 @@ app.post('/api/send-sequence', async (req, res) => {
 // ---------- Main Script Flow whiteboard layout (shared across browsers/setters) ----------
 let flowLayoutMem = null; // in-memory cache + fallback when no DB
 app.get('/api/flow-layout', async (_req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate'); // never serve a stale layout
   if (USE_DB) {
     try {
       const rows = await sb(`${SB_TABLE}?id=eq.${FLOW_LAYOUT_ID}&select=data`);

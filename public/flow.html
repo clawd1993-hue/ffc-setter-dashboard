@@ -131,6 +131,7 @@
     <button class="btn" id="undoBtn" onclick="undo()" title="Undo last change (⌘Z)">↶ Undo</button>
     <button class="btn" id="saveBtn" onclick="saveNow()" title="Save now (⌘S)">💾 Save</button>
     <span id="saveStatus" class="savestatus saved" title="Save state">✓ Saved</span>
+    <span id="counts" style="font-size:12px;color:var(--muted);min-width:120px;"></span>
     <button class="btn" onclick="addButton()">+ Add button</button>
     <button class="btn primary" onclick="addNode()">+ Add bubble</button>
   </div>
@@ -784,6 +785,7 @@ function pathD(a,b){
   return `M ${a.x} ${a.y} C ${a.x} ${a.y+dy}, ${b.x} ${b.y-dy}, ${b.x} ${b.y}`;
 }
 function drawWires(){
+  const c=document.getElementById('counts'); if(c) c.textContent=nodes.length+' blocks · '+edges.length+' arrows';
   [...svg.querySelectorAll('.wire,.wirelabel')].forEach(e=>e.remove());
   edges.forEach((e,i)=>{
     const a=nodeById(e.from), b=nodeById(e.to); if(!a||!b)return;
@@ -1071,7 +1073,7 @@ document.addEventListener('keydown',ev=>{
 });
 // load the SHARED layout from the backend first (so every setter sees the same arrangement),
 // fall back to this browser's local cache if the request fails.
-fetch('/api/flow-layout').then(r=>r.json()).then(d=>{ SAVED_LAYOUT=d&&d.layout||null; })
+fetch('/api/flow-layout?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(d=>{ SAVED_LAYOUT=d&&d.layout||null; })
   .catch(()=>{ try{ SAVED_LAYOUT=JSON.parse(localStorage.getItem('flowPos')||'null'); }catch(e){} })
   .finally(boot);
 </script>
