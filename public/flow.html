@@ -213,34 +213,34 @@ function seed(){
 
     // ===== GATE → 🟢 GREEN =====
     {id:'green1', x:420, y:4160, title:'🟢 GREEN · goal + proof + plan', steps:[
-      {t:'msg',  text:"Okay, then let's get you moving 👌 You said you want [their thing]. Let me show you what that actually looks like"},
+      {t:'msg',  text:"Okay, then let's get you moving \ud83d\udc4c You said you want [their thing: a better life for yourself / out of the 9\u20135 / supplement the income], so let me show you what that actually looks like"},
       {t:'flow', name:'Proof'},
-      {t:'msg',  text:"The fastest way there is this: we build your site, load it with the proven products and set up your first ad, so you're selling in days, not months. Our Head Coach can walk you through exactly how that'd look on a quick call, she only takes a few a week. Want me to grab you a spot with her this week?"}]},
+      {t:'msg',  text:"The fastest way there is this: we build your site, load it with the proven products and set up your first ad, so you're selling in days, not months. Our Head Coach can walk you through exactly how that'd look for you on a quick call, and she only takes a few of these a week. Want me to grab you a spot with her this week?"}]},
     {id:'rt_greenyes', x:420, y:4620, kind:'route', title:'They say YES to the call?'},
     {id:'green_book', x:420, y:4900, title:'🟢 Book the call', steps:[
-      {t:'msg',  text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'msg',  text:"Perfect \ud83d\ude4c Here's the link, it takes only 2 minutes to register. Grab a time this week you know you'll make \ud83d\udc47"},
       {t:'flow', name:'Booking Link'}]},
 
     // ===== GATE → 🟡 YELLOW (isolate → objection types) =====
     {id:'yellow1', x:1540, y:4160, title:'🟡 YELLOW · isolate (no link yet)', steps:[
-      {t:'msg', text:"Totally fair. Just so I understand, is it more the investment side, or more that you're not sure this would actually work for you?"}]},
+      {t:'msg', text:"Totally fair. Just so I understand you right, is it more the investment side, or more that you're not sure this would actually work for you?"}]},
     {id:'rt_yellow', x:1540, y:4620, kind:'route', title:'They answer: which objection?'},
     {id:'y_2a', x:360,  y:4900, title:'🟡 Price · HAS income', steps:[
       {t:'msg', text:'Got it. If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
     {id:'y_2b', x:820,  y:4900, title:'🟡 Price · NO income (max 3 msgs, never a number)', steps:[
-      {t:'msg', text:'Is the investment the only thing, or do you want to see if the value makes sense first?'}]},
+      {t:'msg', text:"Totally fair! Just so I understand, is the investment the only thing that would determine whether this is a good fit for you right now, or do you want to see first if the value makes sense?"}]},
     {id:'y_2c', x:1280, y:4900, title:'🟡 Fit / doubt (not sure it\'d work)', steps:[
-      {t:'msg', text:'Got it, smart to be cautious. So let me not sell you anything: what would make this a yes for you?'}]},
+      {t:'msg', text:"Got it, it's smart to be cautious. So let me not sell you anything: what would make this a yes for you?"}]},
     {id:'y_2d', x:1740, y:4900, title:'🟡 DIY (I\'ll try myself)', steps:[
-      {t:'msg', text:'Sure, and you can. One thing: testing the offer, funnel and ads yourself is exactly where the ad spend goes before you find what works.'}]},
+      {t:'msg', text:"Sure, and you can. One thing though: testing the offer, the funnel and the ads yourself is exactly where the ad spend goes before you find what works."}]},
     {id:'y_2e', x:2200, y:4900, title:'🟡 Time (too busy)', steps:[
-      {t:'msg', text:"Totally get it, life's full. But will next month actually be less busy? The fact you don't have time is probably why you need this more. We build the whole thing so it doesn't eat your week. How many hours a week could you realistically give it?"}]},
+      {t:'msg', text:"Totally get it, life's full. But will next month actually be less busy, or will something else just take its place? Because the fact that you don't have time is probably why you need this more than anyone else. We build the whole thing for you exactly so it doesn't eat your week. So how many hours a week could you realistically give it?"}]},
     {id:'y_2f', x:2660, y:4900, title:'🟡 Authority (talk to partner)', steps:[
-      {t:'msg', text:'Makes sense. One thing: if you went to them today and they asked what you think, would you say it\'s the right move, or still have doubts yourself?'}]},
+      {t:'msg', text:"That makes total sense, you shouldn't make a decision like this without your partner on board if they're involved in the decision making. One thing though: if you went to them today and they asked what you think, would you tell them it's the right move, or do you still have doubts yourself?"}]},
 
     // ===== GATE → 🔴 RED =====
     {id:'red1', x:2860, y:4160, title:'🔴 RED · downsell to the challenge (no call/proof/link)', steps:[
-      {t:'msg', text:"No worries, I understand 🙏 Then the right move right now is the challenge, not Elite. You've got the training and products, you can get first sales on your own, I'm here to answer questions. When you're in a better position to go full force, reach back and we'll set up the call. I'll check in with you on [date] 🙌"}]},
+      {t:'msg', text:"No worries, I understand \ud83d\ude4f Then the right move for you right now is the challenge, not Elite. You've got the training and the products, you can get your first sales with that on your own, and I'm here to answer any questions you have along the way. When you're in a better position to go full force, reach back and we'll set up the call then. I'll check in with you on [date/2 weeks/ around Christmas eg.] \ud83d\ude4c"}]},
     {id:'red_note', x:2860, y:4620, kind:'route', title:'→ cancel Calendly · tag UQ-red · check-in date 2–4 weeks out'},
 
 
@@ -259,105 +259,111 @@ function seed(){
       {t:'msg',  text:'Want me to grab you a spot with her this week?'}]},
     {id:'rt_2b2', x:800, y:5760, kind:'route', title:'Yes to a spot?'},
     {id:'y_2b_msg3', x:800, y:6020, title:'🟡 2b · msg3 (last question)', steps:[
-      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+      {t:'msg', text:"Got it. One last thing, if the investment wasn't a factor at all, would you actually want to do this?"}]},
     {id:'rt_2b3', x:800, y:6300, kind:'route', title:'Their answer?'},
 
     // ===== 2c · Fit / doubt sub-branches =====
     {id:'rt_2c', x:1300, y:5180, kind:'route', title:'What would make it a yes?'},
     {id:'y_2c_guar', x:1120, y:5460, title:'🟡 2c · Wants a guarantee', steps:[
-      {t:'msg', text:"No one can guarantee results — what we guarantee is the setup: we build it with you. It's like the gym, I'm the trainer, I can't grow the muscles for you, but I make sure you're doing the right things."}]},
+      {t:'msg', text:"No one can guarantee results, and I'd be careful with anyone who says they can. What we do guarantee is the setup: we build your site, load it with the proven products and set you up with our top performing ad so you start generating sales on autopilot, 1-1 support with you. And to be fully transparent, every student who launched now has their business up and running and has generated sales using our ads. Of course there are people who haven't launched yet or didn't continue building, they didn't show up for themselves, so they don't have the results. It's like the gym, I'm the personal trainer, I can't grow muscles for you. If you put the work in, the system's already proven."}]},
     {id:'y_2c_price', x:1460, y:5460, title:'🟡 2c · Asks the price', steps:[
-      {t:'msg', text:'Different packages depending where you\'re at — the Head Coach covers that on the call. [then re-ask the question they interrupted]'}]},
+      {t:'msg', text:"There are different packages depending on where you're at, and that's exactly what the Head Coach goes through with you. [then re-ask the interrupted question in the SAME message]"}]},
     {id:'y_2c_call', x:1290, y:5720, title:'🟡 2c · Wants to see inside / talk to someone', steps:[
       {t:'msg', text:"That's exactly what the call is for — you'll see inside and talk it through with the Head Coach."}]},
 
     // ===== 2f · Authority / partner sub-branches =====
     {id:'rt_2f', x:2660, y:5180, kind:'route', title:'Their answer?'},
     {id:'y_2f_both', x:2660, y:5460, title:'🟡 2f · "I\'d recommend it" → both on the call', steps:[
-      {t:'msg', text:"Perfect — then let's get you both on the call so you're aligned. Monday or Tuesday?"}]},
+      {t:'msg', text:"Perfect. Then rather than explaining it all second hand, let's get you both on the call with our Head Coach, she answers all questions directly. Want me to grab a spot that works for both of you?"}]},
     {id:'rt_2f_yes', x:2660, y:5740, kind:'route', title:'Yes?'},
 
     // v2: inline duplicates so paths flow straight down (no back-lines / circling)
     {id:'y_2b_2c', x:560, y:6560, title:'🟡 2b · it was never the money', steps:[
-      {t:'msg', text:'So it was never really about the money then — let me not sell you anything, what would make this a yes for you?'}]},
+      {t:'msg', text:"Got it, it's smart to be cautious. So let me not sell you anything: what would make this a yes for you?"}]},
     {id:'y_2b_red', x:200, y:6560, title:'🔴 2b · hard no → downsell to challenge', steps:[
-      {t:'msg', text:"No worries, I understand 🙏 Then the right move right now is the challenge, not Elite. You've got the training and products, get your first sales on your own, I'm here for questions. When you're in a better spot, reach back and we'll set up the call. I'll check in with you on [date] 🙌"}]},
+      {t:'msg', text:"No worries, I understand \ud83d\ude4f Then the right move for you right now is the challenge, not Elite. You've got the training and the products, you can get your first sales with that on your own, and I'm here to answer any questions you have along the way. When you're in a better position to go full force, reach back and we'll set up the call then. I'll check in with you on [date/2 weeks/ around Christmas eg.] \ud83d\ude4c"}]},
 {id:'y_2f_2c', x:2480, y:6020, title:'🟡 2f · has doubts → what would make it a yes?', steps:[
-      {t:'msg', text:'Got it, smart to be cautious — so let me not sell you anything, what would make this a yes for you?'}]},
+      {t:'msg', text:"Got it, it's smart to be cautious. So let me not sell you anything: what would make this a yes for you?"}]},
 
     // ===== YELLOW · per-type tails (duplicated, no cross-column lines) =====
     {id:'t2a_proof', x:90, y:6900, title:'🟡 2A · Proof + Proposal', steps:[
+      {t:'msg', text:"Okay, then let's get you moving \ud83d\udc4c You said you want [their thing: a better life for yourself / out of the 9\u20135 / supplement the income]. Let me show you what that actually looks like"},
       {t:'flow', name:'Proof'},
-      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+      {t:'msg', text:"The fastest way there is this: we build your site, load it with the proven products and set up your first ad, so you're selling in days, not months. Our Head Coach walks you through exactly how that'd look for you on a quick call, and she only takes a few of these a week. Want me to grab you a spot with her this week?"}]},
     {id:'t2a_spot', x:90, y:7220, kind:'route', title:'Yes to a spot?'},
     {id:'t2a_book', x:-120, y:7500, title:'➡️ 2A · Book the call', steps:[
-      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'msg', text:"Perfect \ud83d\ude4c Here's the link, it takes only 2 minutes to register. Grab a time this week you know you'll make \ud83d\udc47"},
       {t:'flow', name:'Booking Link'}]},
     {id:'t2a_no', x:320, y:7500, title:'🟡 2A · No (now it\'s the money)', steps:[
-      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+      {t:'msg', text:"Got it. One last thing, if the investment wasn't a factor at all, would you actually want to do this?"}]},
     {id:'t2a_nono', x:320, y:7780, kind:'route', title:'Their answer?'},
     {id:'t2a_nurture', x:320, y:8040, title:'🟡 2A · Nurture + check-in', steps:[
-      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+      {t:'msg', text:"Fair enough. Keep going with the challenge and get the first products up, I'll check in with you on [date/2 weeks/ around Christmas eg.] and see how it's going \ud83d\ude4c"}]},
     {id:'t2b_proof', x:650, y:6900, title:'🟡 2B · Proof + Proposal', steps:[
+      {t:'msg', text:"Okay, then let's get you moving \ud83d\udc4c You said you want [their thing: a better life for yourself / out of the 9\u20135 / supplement the income]. Let me show you what that actually looks like"},
       {t:'flow', name:'Proof'},
-      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+      {t:'msg', text:"The fastest way there is this: we build your site, load it with the proven products and set up your first ad, so you're selling in days, not months. Our Head Coach walks you through exactly how that'd look for you on a quick call, and she only takes a few of these a week. Want me to grab you a spot with her this week?"}]},
     {id:'t2b_spot', x:650, y:7220, kind:'route', title:'Yes to a spot?'},
     {id:'t2b_book', x:440, y:7500, title:'➡️ 2B · Book the call', steps:[
-      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'msg', text:"Perfect \ud83d\ude4c Here's the link, it takes only 2 minutes to register. Grab a time this week you know you'll make \ud83d\udc47"},
       {t:'flow', name:'Booking Link'}]},
     {id:'t2b_no', x:880, y:7500, title:'🟡 2B · No (now it\'s the money)', steps:[
-      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+      {t:'msg', text:"Got it. One last thing, if the investment wasn't a factor at all, would you actually want to do this?"}]},
     {id:'t2b_nono', x:880, y:7780, kind:'route', title:'Their answer?'},
     {id:'t2b_nurture', x:880, y:8040, title:'🟡 2B · Nurture + check-in', steps:[
-      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+      {t:'msg', text:"Fair enough. Keep going with the challenge and get the first products up, I'll check in with you on [date/2 weeks/ around Christmas eg.] and see how it's going \ud83d\ude4c"}]},
     {id:'t2c_proof', x:1210, y:6900, title:'🟡 2C · Proof + Proposal', steps:[
+      {t:'msg', text:"Okay, then let's get you moving \ud83d\udc4c You said you want [their thing: a better life for yourself / out of the 9\u20135 / supplement the income]. Let me show you what that actually looks like"},
       {t:'flow', name:'Proof'},
-      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+      {t:'msg', text:"The fastest way there is this: we build your site, load it with the proven products and set up your first ad, so you're selling in days, not months. Our Head Coach walks you through exactly how that'd look for you on a quick call, and she only takes a few of these a week. Want me to grab you a spot with her this week?"}]},
     {id:'t2c_spot', x:1210, y:7220, kind:'route', title:'Yes to a spot?'},
     {id:'t2c_book', x:1000, y:7500, title:'➡️ 2C · Book the call', steps:[
-      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'msg', text:"Perfect \ud83d\ude4c Here's the link, it takes only 2 minutes to register. Grab a time this week you know you'll make \ud83d\udc47"},
       {t:'flow', name:'Booking Link'}]},
     {id:'t2c_no', x:1440, y:7500, title:'🟡 2C · No (now it\'s the money)', steps:[
-      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+      {t:'msg', text:"Got it. One last thing, if the investment wasn't a factor at all, would you actually want to do this?"}]},
     {id:'t2c_nono', x:1440, y:7780, kind:'route', title:'Their answer?'},
     {id:'t2c_nurture', x:1440, y:8040, title:'🟡 2C · Nurture + check-in', steps:[
-      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+      {t:'msg', text:"Fair enough. Keep going with the challenge and get the first products up, I'll check in with you on [date/2 weeks/ around Christmas eg.] and see how it's going \ud83d\ude4c"}]},
     {id:'t2d_proof', x:1770, y:6900, title:'🟡 2D · Proof + Proposal', steps:[
+      {t:'msg', text:"Okay, then let's get you moving \ud83d\udc4c You said you want [their thing: a better life for yourself / out of the 9\u20135 / supplement the income]. Let me show you what that actually looks like"},
       {t:'flow', name:'Proof'},
-      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+      {t:'msg', text:"The fastest way there is this: we build your site, load it with the proven products and set up your first ad, so you're selling in days, not months. Our Head Coach walks you through exactly how that'd look for you on a quick call, and she only takes a few of these a week. Want me to grab you a spot with her this week?"}]},
     {id:'t2d_spot', x:1770, y:7220, kind:'route', title:'Yes to a spot?'},
     {id:'t2d_book', x:1560, y:7500, title:'➡️ 2D · Book the call', steps:[
-      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'msg', text:"Perfect \ud83d\ude4c Here's the link, it takes only 2 minutes to register. Grab a time this week you know you'll make \ud83d\udc47"},
       {t:'flow', name:'Booking Link'}]},
     {id:'t2d_no', x:2000, y:7500, title:'🟡 2D · No (now it\'s the money)', steps:[
-      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+      {t:'msg', text:"Got it. One last thing, if the investment wasn't a factor at all, would you actually want to do this?"}]},
     {id:'t2d_nono', x:2000, y:7780, kind:'route', title:'Their answer?'},
     {id:'t2d_nurture', x:2000, y:8040, title:'🟡 2D · Nurture + check-in', steps:[
-      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+      {t:'msg', text:"Fair enough. Keep going with the challenge and get the first products up, I'll check in with you on [date/2 weeks/ around Christmas eg.] and see how it's going \ud83d\ude4c"}]},
     {id:'t2e_proof', x:2330, y:6900, title:'🟡 2E · Proof + Proposal', steps:[
+      {t:'msg', text:"Okay, then let's get you moving \ud83d\udc4c You said you want [their thing: a better life for yourself / out of the 9\u20135 / supplement the income]. Let me show you what that actually looks like"},
       {t:'flow', name:'Proof'},
-      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+      {t:'msg', text:"The fastest way there is this: we build your site, load it with the proven products and set up your first ad, so you're selling in days, not months. Our Head Coach walks you through exactly how that'd look for you on a quick call, and she only takes a few of these a week. Want me to grab you a spot with her this week?"}]},
     {id:'t2e_spot', x:2330, y:7220, kind:'route', title:'Yes to a spot?'},
     {id:'t2e_book', x:2120, y:7500, title:'➡️ 2E · Book the call', steps:[
-      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'msg', text:"Perfect \ud83d\ude4c Here's the link, it takes only 2 minutes to register. Grab a time this week you know you'll make \ud83d\udc47"},
       {t:'flow', name:'Booking Link'}]},
     {id:'t2e_no', x:2560, y:7500, title:'🟡 2E · No (now it\'s the money)', steps:[
-      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+      {t:'msg', text:"Got it. One last thing, if the investment wasn't a factor at all, would you actually want to do this?"}]},
     {id:'t2e_nono', x:2560, y:7780, kind:'route', title:'Their answer?'},
     {id:'t2e_nurture', x:2560, y:8040, title:'🟡 2E · Nurture + check-in', steps:[
-      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+      {t:'msg', text:"Fair enough. Keep going with the challenge and get the first products up, I'll check in with you on [date/2 weeks/ around Christmas eg.] and see how it's going \ud83d\ude4c"}]},
     {id:'t2f_proof', x:2890, y:6900, title:'🟡 2F · Proof + Proposal', steps:[
+      {t:'msg', text:"Okay, then let's get you moving \ud83d\udc4c You said you want [their thing: a better life for yourself / out of the 9\u20135 / supplement the income]. Let me show you what that actually looks like"},
       {t:'flow', name:'Proof'},
-      {t:'msg',  text:"We build your site, load it with the proven products and set up your first ad, so you're selling in days not months. Our Head Coach can walk you through exactly how that'd look on a quick call — want me to grab you a spot with her this week?"}]},
+      {t:'msg', text:"The fastest way there is this: we build your site, load it with the proven products and set up your first ad, so you're selling in days, not months. Our Head Coach walks you through exactly how that'd look for you on a quick call, and she only takes a few of these a week. Want me to grab you a spot with her this week?"}]},
     {id:'t2f_spot', x:2890, y:7220, kind:'route', title:'Yes to a spot?'},
     {id:'t2f_book', x:2680, y:7500, title:'➡️ 2F · Book the call', steps:[
-      {t:'msg', text:"Perfect 🙌 Here's the link, 2 minutes to register. Grab a time this week you know you'll make 👇"},
+      {t:'msg', text:"Perfect \ud83d\ude4c Here's the link, it takes only 2 minutes to register. Grab a time this week you know you'll make \ud83d\udc47"},
       {t:'flow', name:'Booking Link'}]},
     {id:'t2f_no', x:3120, y:7500, title:'🟡 2F · No (now it\'s the money)', steps:[
-      {t:'msg', text:'If the investment wasn\'t a factor at all, would you actually want to do this?'}]},
+      {t:'msg', text:"Got it. One last thing, if the investment wasn't a factor at all, would you actually want to do this?"}]},
     {id:'t2f_nono', x:3120, y:7780, kind:'route', title:'Their answer?'},
     {id:'t2f_nurture', x:3120, y:8040, title:'🟡 2F · Nurture + check-in', steps:[
-      {t:'msg', text:'Fair enough. Keep going with the challenge and get your first products up — I\'ll check in with you on [date] 🙌'}]},
+      {t:'msg', text:"Fair enough. Keep going with the challenge and get the first products up, I'll check in with you on [date/2 weeks/ around Christmas eg.] and see how it's going \ud83d\ude4c"}]},
   );
   edges=[
     {from:'n1', to:'n2', label:'Beginner / first look'},
