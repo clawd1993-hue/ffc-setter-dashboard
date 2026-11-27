@@ -717,6 +717,10 @@ function resetLayout(){
 }
 
 function nodeById(id){return nodes.find(n=>n.id===id);}
+// always return an id not already in use (prevents n4-collides-with-n4 bugs)
+function uniqueId(prefix){ let id; do { id=prefix+(uid++); } while(nodeById(id)); return id; }
+// after a load, push uid past every existing numeric-suffixed id so new blocks start clean
+function bumpUid(){ let mx=uid; nodes.forEach(n=>{ const m=/(\d+)$/.exec(n.id); if(m) mx=Math.max(mx, (+m[1])+1); }); uid=mx; }
 
 function renderNodes(){
   // remove existing node divs (keep svg)
@@ -854,7 +858,7 @@ function focusNode(id){
 // pop-up asked whenever a NEW arrow is created → label it (button text / Yes / No / blank)
 function duplicateNode(id){
   const n=nodeById(id); if(!n) return;
-  let newId=id+'_c'+(uid++); while(nodeById(newId)) newId=id+'_c'+(uid++);
+  const newId=uniqueId(id+'_c');
   const copy={id:newId, x:(n.x||0)+40, y:(n.y||0)+40, kind:n.kind, title:n.title, text:n.text, _added:true};
   if(n.steps) copy.steps=JSON.parse(JSON.stringify(n.steps)); // deep-copy the text blocks
   nodes.push(copy);
@@ -998,7 +1002,7 @@ document.addEventListener('pointerup',ev=>{
     } else if(!tgt){
       // dropped on empty canvas → SPAWN a new branch bubble here and connect
       const pt=toCanvas(ev.clientX,ev.clientY);
-      const id='n'+(uid++);
+      const id=uniqueId('n');
       const lbl=askArrowLabel();
       nodes.push({id, x:pt.x-115, y:pt.y-10, title:'New bubble', steps:[{t:'msg',text:'New message bubble.'}], _added:true});
       edges.push({from:link.from,to:id,label:lbl,_added:true});
@@ -1015,7 +1019,7 @@ function toCanvas(cx,cy){
 }
 
 function addNode(){
-  const id='n'+(uid++);
+  const id=uniqueId('n');
   const board=document.getElementById('board');
   const x=(board.scrollLeft+500)/zoom, y=(board.scrollTop+160)/zoom;
   nodes.push({id, x, y, title:'New bubble', steps:[{t:'msg',text:'New message bubble.'}], _added:true});
@@ -1025,7 +1029,7 @@ function addNode(){
 function addButton(){
   const label=prompt('Button / junction label (e.g. "Their answer?", "Yes to a spot?"):','');
   if(label===null) return;
-  const id='rt'+(uid++);
+  const id=uniqueId('rt');
   const board=document.getElementById('board');
   const x=(board.scrollLeft+500)/zoom, y=(board.scrollTop+220)/zoom;
   nodes.push({id, x, y, kind:'route', title:label.trim()||'Their answer?', _added:true});
@@ -1045,6 +1049,7 @@ function resetView(smooth=true){
 
 function boot(){
   try { seed(); } catch(err){ document.querySelector('.topbar .sub').textContent='INIT ERROR: '+err.message; console.error(err); }
+  bumpUid(); // ensure new-block ids start above every id already on the board
   resetView(false); // start centered at the top, instantly
   lastSnapshot=JSON.stringify(currentLayout()); // baseline so the first change becomes an undo point
   updateUndoBtn();
