@@ -50,6 +50,9 @@
   .stepmsg .pencil:hover{opacity:1;background:#EAF3FF;border-color:#BFDBFF;}
   .stepmsg .smtext{display:block;white-space:pre-wrap;}
   .stepmsg .smtext[contenteditable="true"]{outline:2px solid var(--blue);background:#fff;border-radius:5px;padding:3px 4px;cursor:text;}
+  /* tiny unique id badge, bottom-left of each node — a handle we can reference */
+  .nid{position:absolute;bottom:2px;left:6px;font-size:8px;font-weight:700;letter-spacing:.3px;color:#B4BECC;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:none;user-select:text;}
   /* reviewed = logic checked & done */
   .node.reviewed{background:#E7F7EC;border-color:#A7E0BA;}
   .rev-toggle{position:absolute;top:7px;right:8px;width:18px;height:18px;border-radius:50%;border:1.5px solid #CBD5E0;
@@ -648,10 +651,11 @@ function renderNodes(){
     el.className='node'; el.dataset.id=n.id;
     el.style.left=n.x+'px'; el.style.top=n.y+'px';
     const revBtn=`<div class="rev-toggle" title="Mark reviewed / done">✓</div>`;
+    const idTag=`<div class="nid" title="block id">${esc(n.id)}</div>`;
     if(n.kind==='route'){
       el.className='node route';
       el.innerHTML=`
-        ${revBtn}
+        ${revBtn}${idTag}
         <div class="port in" data-port="in"></div>
         <div class="routelabel">${esc(n.title)}</div>
         <div class="port out" data-port="out"></div>`;
@@ -661,7 +665,7 @@ function renderNodes(){
         ? `<div class="stepflow">⚡ ${esc(s.name)}</div>`
         : `<div class="stepmsg" data-si="${si}"><span class="smtext">${esc(s.text)}</span><span class="pencil" title="Edit this text">✏️</span></div>`).join('');
       el.innerHTML=`
-        ${revBtn}
+        ${revBtn}${idTag}
         <div class="port in" data-port="in"></div>
         <div class="head"><span class="dot"></span><span class="title">${esc(n.title)}</span></div>
         <div class="body">${body}</div>
