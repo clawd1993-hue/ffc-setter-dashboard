@@ -710,16 +710,15 @@ function applyLayout(layout){
   const pos=layout.pos||layout, mids=layout.mids||{}; // backward-compat
   nodes.forEach(n=>{ if(pos[n.id]){ n.x=pos[n.id].x; n.y=pos[n.id].y; } });
   if(Array.isArray(layout.rules)){ hardRules=layout.rules.slice(); renderRules(); }
-  // re-add user-created blocks first (edges may reference them)
-  (layout.addedNodes||[]).forEach(n=>{ if(!nodeById(n.id)){ n._added=true; nodes.push(n); } });
-  (layout.addedEdges||[]).forEach(se=>{ if(!edges.some(e=>e.from===se.from&&e.to===se.to)) edges.push({from:se.from,to:se.to,label:se.label||'',_added:true}); });
-  // re-apply deletions of seed edges
+  // 1) apply deletions FIRST (so a re-drawn arrow can't collide with a deleted seed edge and vanish)
   removedEdges=(layout.removedEdges||[]).slice();
   removedEdges.forEach(k=>{ const p=k.split('>'); const idx=edges.findIndex(e=>e.from===p[0]&&e.to===p[1]); if(idx>=0) edges.splice(idx,1); });
-  // re-apply deletions of seed nodes (+ any edges touching them)
   removedNodes=(layout.removedNodes||[]).slice();
   removedNodes.forEach(id=>{ const i=nodes.findIndex(n=>n.id===id); if(i>=0) nodes.splice(i,1);
     for(let j=edges.length-1;j>=0;j--){ if(edges[j].from===id||edges[j].to===id) edges.splice(j,1); } });
+  // 2) THEN re-add user-created blocks + arrows (nodes before edges, edges may reference them)
+  (layout.addedNodes||[]).forEach(n=>{ if(!nodeById(n.id)){ n._added=true; nodes.push(n); } });
+  (layout.addedEdges||[]).forEach(se=>{ if(!edges.some(e=>e.from===se.from&&e.to===se.to)) edges.push({from:se.from,to:se.to,label:se.label||'',_added:true}); });
   // re-apply label changes on seed edges
   if(layout.edgeLabels){ Object.keys(layout.edgeLabels).forEach(k=>{ const p=k.split('>'); const e=edges.find(e=>e.from===p[0]&&e.to===p[1]); if(e){ e.label=layout.edgeLabels[k]; e._labelEdited=true; } }); }
   // apply arrow-bend waypoints LAST — after added edges exist, so bends on new arrows restore too
