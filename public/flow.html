@@ -685,7 +685,6 @@ function applyLayout(layout){
   if(!layout) return;
   const pos=layout.pos||layout, mids=layout.mids||{}; // backward-compat
   nodes.forEach(n=>{ if(pos[n.id]){ n.x=pos[n.id].x; n.y=pos[n.id].y; } });
-  edges.forEach(e=>{ const k=e.from+'>'+e.to; if(mids[k]) e.mid=mids[k]; });
   const rev=layout.reviewed||[]; if(rev.length){ const set=new Set(rev); nodes.forEach(n=>{ n.reviewed=set.has(n.id); }); }
   if(Array.isArray(layout.rules)){ hardRules=layout.rules.slice(); renderRules(); }
   // re-add user-created blocks first (edges may reference them)
@@ -700,6 +699,8 @@ function applyLayout(layout){
     for(let j=edges.length-1;j>=0;j--){ if(edges[j].from===id||edges[j].to===id) edges.splice(j,1); } });
   // re-apply label changes on seed edges
   if(layout.edgeLabels){ Object.keys(layout.edgeLabels).forEach(k=>{ const p=k.split('>'); const e=edges.find(e=>e.from===p[0]&&e.to===p[1]); if(e){ e.label=layout.edgeLabels[k]; e._labelEdited=true; } }); }
+  // apply arrow-bend waypoints LAST — after added edges exist, so bends on new arrows restore too
+  edges.forEach(e=>{ const k=e.from+'>'+e.to; if(mids[k]) e.mid={x:mids[k].x,y:mids[k].y}; });
   if(layout.edits && typeof layout.edits==='object'){
     textEdits=layout.edits;
     Object.keys(textEdits).forEach(id=>{ const n=nodeById(id); if(!n) return; const st=ensureSteps(n);
