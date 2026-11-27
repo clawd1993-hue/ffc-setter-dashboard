@@ -59,6 +59,13 @@
     background:#fff;color:#CBD5E0;font-size:11px;font-weight:800;line-height:15px;text-align:center;cursor:pointer;user-select:none;z-index:3;}
   .rev-toggle:hover{border-color:#2BB667;color:#2BB667;}
   .node.reviewed .rev-toggle{background:#2BB667;border-color:#2BB667;color:#fff;}
+  /* floating button node — a tappable button in the flow */
+  .node.btnnode{width:auto;min-width:110px;max-width:230px;background:linear-gradient(#0A84FF,#0a74e0);border:none;
+    border-radius:999px;box-shadow:0 3px 10px rgba(10,100,220,.32);}
+  .node.btnnode .btnlabel{padding:11px 20px;color:#fff;font-weight:700;font-size:13px;text-align:center;}
+  .node.btnnode .nid{color:rgba(255,255,255,.55);}
+  .node.btnnode .rev-toggle{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5);color:#fff;}
+  .node.btnnode.reviewed{background:linear-gradient(#2BB667,#23a65d);}
   /* route pill — a junction, not a message bubble */
   .node.route{width:230px;background:#EDF1F6;border:1px solid #CFD8E2;border-radius:24px;box-shadow:0 1px 3px rgba(20,40,70,.06);}
   .node.route .routelabel{padding:11px 18px;text-align:center;font-size:13px;font-weight:700;color:#5A6B7D;}
@@ -103,6 +110,8 @@
     <button class="btn" onclick="fitAll()">Fit</button>
     <button class="btn" onclick="resetView()">Reset view</button>
     <button class="btn" onclick="resetLayout()" title="Clear your saved drags, back to default layout">Reset layout</button>
+    <button class="btn" id="undoBtn" onclick="undo()" title="Undo last change (⌘Z)">↶ Undo</button>
+    <button class="btn" onclick="addButton()">+ Add button</button>
     <button class="btn primary" onclick="addNode()">+ Add bubble</button>
   </div>
 
@@ -138,6 +147,11 @@ let hardRules=[];
 let editing=null; // the .smtext element currently being edited
 let textEdits={};  // { nodeId: { stepIndex: "overridden text" } } — shared script tweaks
 let removedEdges=[]; // keys "from>to" of seed edges the user deleted (persisted)
+// ---- undo stack (localStorage-backed so it survives reloads) ----
+let undoStack=[], lastSnapshot=null;
+try{ undoStack=JSON.parse(localStorage.getItem('flowUndo')||'[]'); }catch(e){ undoStack=[]; }
+function persistUndo(){ try{ localStorage.setItem('flowUndo', JSON.stringify(undoStack.slice(-50))); }catch(e){} }
+function updateUndoBtn(){ const b=document.getElementById('undoBtn'); if(b) b.disabled=!undoStack.length; }
 
 // normalize any message bubble to a steps[] array so each text block is addressable/editable
 function ensureSteps(n){ if(!n.steps) n.steps=[{t:'msg',text:n.text||''}]; return n.steps; }
@@ -624,9 +638,20 @@ function currentLayout(){
 }
 function savePositions(){
   const layout=currentLayout();
-  try{ localStorage.setItem('flowPos', JSON.stringify(layout)); }catch(e){} // local cache for instant feel
+  const json=JSON.stringify(layout);
+  if(lastSnapshot!==null && lastSnapshot!==json){ undoStack.push(lastSnapshot); if(undoStack.length>50) undoStack.shift(); persistUndo(); updateUndoBtn(); }
+  lastSnapshot=json;
+  try{ localStorage.setItem('flowPos', json); }catch(e){} // local cache for instant feel
   clearTimeout(saveTimer);                                                   // debounce the shared save
   saveTimer=setTimeout(()=>{ fetch('/api/flow-layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layout})}).catch(()=>{}); }, 500);
+}
+function undo(){
+  if(!undoStack.length) return;
+  const prev=undoStack.pop(); persistUndo();
+  lastSnapshot=null; // don't re-capture the reverted state as a new change on reload
+  try{ localStorage.setItem('flowPos', prev); }catch(e){}
+  // push the reverted state to the shared backend, then rebuild cleanly via reload
+  fetch('/api/flow-layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layout:JSON.parse(prev)})}).finally(()=>location.reload());
 }
 function applyLayout(layout){
   if(!layout) return;
@@ -675,6 +700,13 @@ function renderNodes(){
         ${revBtn}${idTag}
         <div class="port in" data-port="in"></div>
         <div class="routelabel">${esc(n.title)}</div>
+        <div class="port out" data-port="out"></div>`;
+    } else if(n.kind==='button'){
+      el.className='node btnnode';
+      el.innerHTML=`
+        ${revBtn}${idTag}
+        <div class="port in" data-port="in"></div>
+        <div class="btnlabel">🔘 ${esc(n.text||'Button')}</div>
         <div class="port out" data-port="out"></div>`;
     } else {
       const steps=ensureSteps(n);
@@ -920,6 +952,16 @@ function addNode(){
   renderNodes(); drawWires(); try{ wireInteractions(); }catch(e){}
   savePositions();
 }
+function addButton(){
+  const label=prompt('Button text (what the lead taps). Leave blank for a plain button:','');
+  if(label===null) return;
+  const id='btn'+(uid++);
+  const board=document.getElementById('board');
+  const x=(board.scrollLeft+500)/zoom, y=(board.scrollTop+220)/zoom;
+  nodes.push({id, x, y, kind:'button', text:label.trim()||'Button', _added:true});
+  renderNodes(); drawWires(); try{ wireInteractions(); }catch(e){}
+  savePositions();
+}
 function resetView(smooth=true){
   const board=document.getElementById('board');
   if(!nodes.length){ board.scrollTo({left:0,top:0}); return; }
@@ -934,7 +976,12 @@ function resetView(smooth=true){
 function boot(){
   try { seed(); } catch(err){ document.querySelector('.topbar .sub').textContent='INIT ERROR: '+err.message; console.error(err); }
   resetView(false); // start centered at the top, instantly
+  lastSnapshot=JSON.stringify(currentLayout()); // baseline so the first change becomes an undo point
+  updateUndoBtn();
 }
+document.addEventListener('keydown',ev=>{
+  if((ev.metaKey||ev.ctrlKey) && (ev.key==='z'||ev.key==='Z') && !ev.shiftKey && !editing){ ev.preventDefault(); undo(); }
+});
 // load the SHARED layout from the backend first (so every setter sees the same arrangement),
 // fall back to this browser's local cache if the request fails.
 fetch('/api/flow-layout').then(r=>r.json()).then(d=>{ SAVED_LAYOUT=d&&d.layout||null; })
