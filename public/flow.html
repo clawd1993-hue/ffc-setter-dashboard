@@ -59,6 +59,13 @@
     background:#fff;color:#CBD5E0;font-size:11px;font-weight:800;line-height:15px;text-align:center;cursor:pointer;user-select:none;z-index:3;}
   .rev-toggle:hover{border-color:#2BB667;color:#2BB667;}
   .node.reviewed .rev-toggle{background:#2BB667;border-color:#2BB667;color:#fff;}
+  /* delete block (appears on hover) */
+  .node-del{position:absolute;top:7px;right:30px;width:18px;height:18px;border-radius:50%;border:1.5px solid #E7B3B3;
+    background:#fff;color:#C0392B;font-size:12px;font-weight:800;line-height:14px;text-align:center;cursor:pointer;z-index:4;
+    opacity:0;transition:opacity .12s;}
+  .node:hover .node-del{opacity:.85;}
+  .node-del:hover{opacity:1;background:#C0392B;color:#fff;border-color:#C0392B;}
+  .node.btnnode .node-del{background:rgba(255,255,255,.9);}
   /* floating button node — a tappable button in the flow */
   .node.btnnode{width:auto;min-width:110px;max-width:230px;background:linear-gradient(#0A84FF,#0a74e0);border:none;
     border-radius:999px;box-shadow:0 3px 10px rgba(10,100,220,.32);}
@@ -147,6 +154,7 @@ let hardRules=[];
 let editing=null; // the .smtext element currently being edited
 let textEdits={};  // { nodeId: { stepIndex: "overridden text" } } — shared script tweaks
 let removedEdges=[]; // keys "from>to" of seed edges the user deleted (persisted)
+let removedNodes=[]; // ids of seed nodes the user deleted (persisted)
 // ---- undo stack (localStorage-backed so it survives reloads) ----
 let undoStack=[], lastSnapshot=null;
 try{ undoStack=JSON.parse(localStorage.getItem('flowUndo')||'[]'); }catch(e){ undoStack=[]; }
@@ -634,7 +642,7 @@ function currentLayout(){
   const addedNodes=nodes.filter(n=>n._added).map(n=>({id:n.id,x:n.x,y:n.y,title:n.title,kind:n.kind,steps:n.steps,text:n.text}));
   const addedEdges=edges.filter(e=>e._added).map(e=>({from:e.from,to:e.to,label:e.label||''}));
   const edgeLabels={}; edges.forEach(e=>{ if(e._labelEdited && !e._added) edgeLabels[e.from+'>'+e.to]=e.label||''; });
-  return {pos,mids,reviewed,rules:hardRules,edits:textEdits,addedNodes,addedEdges,removedEdges,edgeLabels};
+  return {pos,mids,reviewed,rules:hardRules,edits:textEdits,addedNodes,addedEdges,removedEdges,removedNodes,edgeLabels};
 }
 function savePositions(){
   const layout=currentLayout();
@@ -666,6 +674,10 @@ function applyLayout(layout){
   // re-apply deletions of seed edges
   removedEdges=(layout.removedEdges||[]).slice();
   removedEdges.forEach(k=>{ const p=k.split('>'); const idx=edges.findIndex(e=>e.from===p[0]&&e.to===p[1]); if(idx>=0) edges.splice(idx,1); });
+  // re-apply deletions of seed nodes (+ any edges touching them)
+  removedNodes=(layout.removedNodes||[]).slice();
+  removedNodes.forEach(id=>{ const i=nodes.findIndex(n=>n.id===id); if(i>=0) nodes.splice(i,1);
+    for(let j=edges.length-1;j>=0;j--){ if(edges[j].from===id||edges[j].to===id) edges.splice(j,1); } });
   // re-apply label changes on seed edges
   if(layout.edgeLabels){ Object.keys(layout.edgeLabels).forEach(k=>{ const p=k.split('>'); const e=edges.find(e=>e.from===p[0]&&e.to===p[1]); if(e){ e.label=layout.edgeLabels[k]; e._labelEdited=true; } }); }
   if(layout.edits && typeof layout.edits==='object'){
@@ -693,18 +705,19 @@ function renderNodes(){
     el.className='node'; el.dataset.id=n.id;
     el.style.left=n.x+'px'; el.style.top=n.y+'px';
     const revBtn=`<div class="rev-toggle" title="Mark reviewed / done">✓</div>`;
+    const delBtn=`<div class="node-del" title="Delete this block">✕</div>`;
     const idTag=`<div class="nid" title="block id">${esc(n.id)}</div>`;
     if(n.kind==='route'){
       el.className='node route';
       el.innerHTML=`
-        ${revBtn}${idTag}
+        ${revBtn}${delBtn}${idTag}
         <div class="port in" data-port="in"></div>
         <div class="routelabel">${esc(n.title)}</div>
         <div class="port out" data-port="out"></div>`;
     } else if(n.kind==='button'){
       el.className='node btnnode';
       el.innerHTML=`
-        ${revBtn}${idTag}
+        ${revBtn}${delBtn}${idTag}
         <div class="port in" data-port="in"></div>
         <div class="btnlabel">🔘 ${esc(n.text||'Button')}</div>
         <div class="port out" data-port="out"></div>`;
@@ -714,7 +727,7 @@ function renderNodes(){
         ? `<div class="stepflow">⚡ ${esc(s.name)}</div>`
         : `<div class="stepmsg" data-si="${si}"><span class="smtext">${esc(s.text)}</span><span class="pencil" title="Edit this text">✏️</span></div>`).join('');
       el.innerHTML=`
-        ${revBtn}${idTag}
+        ${revBtn}${delBtn}${idTag}
         <div class="port in" data-port="in"></div>
         <div class="head"><span class="dot"></span><span class="title">${esc(n.title)}</span></div>
         <div class="body">${body}</div>
@@ -817,6 +830,17 @@ function focusNode(id){
   })(t0);
 }
 // pop-up asked whenever a NEW arrow is created → label it (button text / Yes / No / blank)
+function deleteNode(id){
+  const n=nodeById(id); if(!n) return;
+  const label=(n.title||n.text||id);
+  if(!confirm('Delete this block?\n\n“'+label+'”\n\nAny arrows to/from it are removed too.')) return;
+  // drop edges touching it (remember seed-edge deletions)
+  for(let i=edges.length-1;i>=0;i--){ const e=edges[i]; if(e.from===id||e.to===id){ if(!e._added) removedEdges.push(e.from+'>'+e.to); edges.splice(i,1); } }
+  const idx=nodes.findIndex(x=>x.id===id); if(idx>=0) nodes.splice(idx,1);
+  if(!n._added) removedNodes.push(id); // seed node → persist its removal
+  renderNodes(); drawWires(); try{ wireInteractions(); }catch(e){}
+  savePositions();
+}
 function askArrowLabel(){
   const v=prompt('Label this arrow — e.g. a button, Yes / No, or a branch name.\n(Leave blank for no label.)','');
   return v===null ? '' : v.trim();
@@ -839,6 +863,11 @@ let drag=null, link=null, tempPath=null, labelDrag=null;
 function wireInteractions(){
   canvas.querySelectorAll('.node').forEach(el=>{
     const id=el.dataset.id;
+    const del=el.querySelector('.node-del');
+    if(del){
+      del.addEventListener('pointerdown',ev=>ev.stopPropagation());
+      del.addEventListener('click',ev=>{ ev.stopPropagation(); deleteNode(id); });
+    }
     const rev=el.querySelector('.rev-toggle');
     if(rev){
       rev.addEventListener('pointerdown',ev=>ev.stopPropagation()); // don't start a drag
@@ -863,6 +892,7 @@ function wireInteractions(){
     el.addEventListener('pointerdown',ev=>{
       if(ev.target.classList.contains('port')) return; // handled below
       if(ev.target.classList.contains('rev-toggle')) return; // review toggle, not a drag
+      if(ev.target.classList.contains('node-del')) return; // delete button, not a drag
       if(ev.target.classList.contains('pencil')) return; // edit pencil, not a drag
       if(editing) return; // don't drag while editing a text block
       const n=nodeById(id); const p=toCanvas(ev.clientX,ev.clientY);
