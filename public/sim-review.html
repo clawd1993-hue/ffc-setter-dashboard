@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FFC Setter — Sim Review</title>
+<style>
+  :root{--bg:#F4F6F9;--ink:#1C2B3A;--muted:#6B7A8D;--line:#E3E9EF;--blue:#0A84FF;--card:#fff;}
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);}
+  .topbar{position:fixed;top:0;left:0;right:0;height:52px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 18px;z-index:20;}
+  .topbar h1{font-size:15px;font-weight:700;margin:0;}
+  .topbar .sub{font-size:12px;color:var(--muted);}
+  .spacer{flex:1;}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink);}
+  .btn:hover{background:#F7F9FB;}
+  .btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .wrap{position:absolute;top:52px;left:0;right:0;bottom:0;display:flex;}
+  /* left: sim list */
+  .list{width:280px;border-right:1px solid var(--line);background:#fff;overflow:auto;flex:0 0 auto;}
+  .filters{display:flex;gap:6px;padding:10px;flex-wrap:wrap;border-bottom:1px solid var(--line);}
+  .chip{font-size:11px;padding:4px 9px;border:1px solid var(--line);border-radius:14px;cursor:pointer;background:#fff;}
+  .chip.on{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .simrow{padding:10px 12px;border-bottom:1px solid #F0F3F6;cursor:pointer;}
+  .simrow:hover{background:#F7F9FB;}
+  .simrow.sel{background:#EAF3FF;}
+  .simrow .t{font-size:13px;font-weight:700;}
+  .simrow .m{font-size:11px;color:var(--muted);margin-top:2px;}
+  .badge{display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:6px;vertical-align:middle;}
+  .b-pass{background:#E7F7EC;color:#1C8A4C;} .b-fail{background:#FCE8E6;color:#C0392B;}
+  .b-flag{background:#FFF4D6;color:#9A7B10;} .b-unrev{background:#EEF2F6;color:#8A98A8;}
+  /* center: chat */
+  .chat{flex:1;overflow:auto;padding:18px 22px;}
+  .chat .meta{font-size:12px;color:var(--muted);margin-bottom:14px;}
+  .turn{display:flex;margin:10px 0;gap:10px;}
+  .turn.lead{justify-content:flex-start;} .turn.setter{justify-content:flex-end;}
+  .bubble{max-width:62%;padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.4;position:relative;}
+  .lead .bubble{background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px;}
+  .setter .bubble{background:#0A84FF;color:#fff;border-bottom-right-radius:4px;}
+  .nodeTag{font-size:10px;font-weight:700;opacity:.8;margin-top:5px;font-family:ui-monospace,Menlo,monospace;}
+  .mismatch{outline:2px solid #E67E22;}
+  .cbtn{position:absolute;bottom:-9px;right:-9px;width:22px;height:22px;border-radius:50%;background:#fff;border:1px solid var(--line);cursor:pointer;font-size:12px;line-height:20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.1);}
+  .cbtn.has{background:#FFF4D6;border-color:#E6CF7A;}
+  .composer{margin:6px 0 2px;background:#FFFDF4;border:1px solid #E6CF7A;border-radius:10px;padding:8px;}
+  .composer textarea{width:100%;border:1px solid var(--line);border-radius:7px;padding:6px;font:inherit;font-size:13px;min-height:44px;resize:vertical;}
+  .composer .row{display:flex;gap:7px;margin-top:6px;align-items:center;}
+  .composer select{font:inherit;font-size:12px;padding:4px;border:1px solid var(--line);border-radius:6px;}
+  .cmt{font-size:12px;background:#FFFDF4;border-left:3px solid #E6CF7A;padding:5px 8px;margin:4px 0;border-radius:4px;}
+  .cmt .tag{font-weight:800;color:#9A7B10;}
+  /* right: comment bank */
+  .bank{width:330px;border-left:1px solid var(--line);background:#fff;overflow:auto;flex:0 0 auto;padding:12px;}
+  .bank h3{font-size:13px;margin:4px 0 10px;}
+  .bankNode{border:1px solid var(--line);border-radius:10px;padding:9px;margin-bottom:9px;}
+  .bankNode .nid{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:800;color:var(--blue);}
+  .bankNode .ct{font-size:12px;color:var(--muted);}
+  .empty{color:var(--muted);font-size:13px;padding:20px;text-align:center;}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>Sim Review</h1><span class="sub" id="sub">— setter simulations</span>
+    <div class="spacer"></div>
+    <span id="status" style="font-size:12px;color:var(--muted);"></span>
+    <button class="btn" id="bankToggle" onclick="toggleBank()">Comment Bank</button>
+    <a class="btn" href="/flow.html" title="the script tree">↩ Flow</a>
+  </div>
+  <div class="wrap">
+    <div class="list" id="list"></div>
+    <div class="chat" id="chat"><div class="empty">Pick a simulation on the left.</div></div>
+    <div class="bank" id="bank" style="display:none;"></div>
+  </div>
+
+<script>
+// ---- state ----
+let SIMS=[], COMMENTS=[], curId=null, filter='all';
+const TAGS=['off-script','wrong-route','off-tone','logic-gap','good','other'];
+
+// ---- dummy fallback (so the skeleton is clickable before real sims exist) ----
+const DUMMY=[
+  {id:'sim_001',avatar:'eager / ready',answerStyle:'clean answers',status:'pass',outcome:'booked',turns:[
+    {role:'setter',text:"Let me send you a quick voice note so you get how the whole thing works 🙌",nodeId:'n1',expectedNodeId:'n1'},
+    {role:'lead',text:"ok watched it, looks good"},
+    {role:'setter',text:"Nice, so you've seen the whole picture now 👌 And so why now? What changed recently?",nodeId:'why_watched',expectedNodeId:'why_watched'},
+    {role:'lead',text:"lost my job last month, need income fast"},
+    {role:'setter',text:"That makes sense. And have you ever invested in yourself like this before?",nodeId:'s3_job',expectedNodeId:'s3_job'},
+    {role:'lead',text:"yeah a course once, did nothing with it"},
+    {role:'setter',text:"Perfect 🙌 Here's the link, grab a time this week 👇",nodeId:'green_book',expectedNodeId:'green_book'}
+  ]},
+  {id:'sim_002',avatar:'broke / skeptical',answerStyle:'asks price early',status:'flagged',outcome:'nurture',turns:[
+    {role:'setter',text:"Let me send you a quick voice note so you get how the whole thing works 🙌",nodeId:'n1',expectedNodeId:'n1'},
+    {role:'lead',text:"how much does this cost though"},
+    {role:'setter',text:"We have different types of packages so it really comes down to what would be the absolute best fit for you. Anyway — why now, what changed recently?",nodeId:'price_deflect',expectedNodeId:'price_deflect'},
+    {role:'lead',text:"idk just looking i guess"},
+    {role:'setter',text:"It's $5,000 for the Elite license.",nodeId:'y_2c_price',expectedNodeId:'rt_setupA'}
+  ]},
+  {id:'sim_003',avatar:'already burned',answerStyle:'dodges',status:'unreviewed',outcome:'nurture',turns:[
+    {role:'setter',text:"Let me send you a quick voice note so you get how the whole thing works 🙌",nodeId:'n1',expectedNodeId:'n1'},
+    {role:'lead',text:"tried this kinda thing before, got burned"},
+    {role:'setter',text:"I hear you. What happened last time?",nodeId:'s3_burned',expectedNodeId:'s3_burned'},
+    {role:'lead',text:"paid for coaching, got ghosted"}
+  ]}
+];
+
+async function load(){
+  try{
+    const [s,c]=await Promise.all([
+      fetch('/api/sims?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()),
+      fetch('/api/sim-comments?t='+Date.now(),{cache:'no-store'}).then(r=>r.json())
+    ]);
+    SIMS=(s.sims&&s.sims.length)?s.sims:DUMMY;
+    COMMENTS=c.comments||[];
+  }catch(e){ SIMS=DUMMY; COMMENTS=[]; }
+  renderList(); setStatus('loaded');
+}
+function setStatus(t){ document.getElementById('status').textContent=t; }
+function statusBadge(st){ const m={pass:'b-pass',fail:'b-fail',flagged:'b-flag',unreviewed:'b-unrev'}; return `<span class="badge ${m[st]||'b-unrev'}">${st||'unreviewed'}</span>`; }
+
+function renderList(){
+  const sims=SIMS.filter(s=>filter==='all'||s.status===filter);
+  const counts=TAGS; // unused placeholder
+  document.getElementById('sub').textContent=`— ${SIMS.length} sims · ${COMMENTS.length} comments`;
+  const fbar=['all','pass','fail','flagged','unreviewed'].map(f=>`<span class="chip ${filter===f?'on':''}" onclick="setFilter('${f}')">${f}</span>`).join('');
+  const rows=sims.map(s=>`<div class="simrow ${s.id===curId?'sel':''}" onclick="selectSim('${s.id}')">
+      <div class="t">${s.id} ${statusBadge(s.status)}</div>
+      <div class="m">${s.avatar} · ${s.answerStyle} → ${s.outcome||'?'}</div></div>`).join('');
+  document.getElementById('list').innerHTML=`<div class="filters">${fbar}</div>${rows||'<div class="empty">none</div>'}`;
+}
+function setFilter(f){ filter=f; renderList(); }
+
+function selectSim(id){ curId=id; renderList(); renderChat(); }
+function renderChat(){
+  const sim=SIMS.find(s=>s.id===curId); if(!sim){return;}
+  const head=`<div class="meta"><b>${sim.id}</b> — ${sim.avatar} · ${sim.answerStyle} · outcome: ${sim.outcome||'?'} ${statusBadge(sim.status)}
+     &nbsp; <button class="btn" onclick="mark('${sim.id}','pass')">✓ Pass</button>
+     <button class="btn" onclick="mark('${sim.id}','flagged')">⚑ Flag</button>
+     <button class="btn" onclick="mark('${sim.id}','fail')">✕ Fail</button></div>`;
+  const turns=sim.turns.map((t,i)=>{
+    if(t.role==='lead') return `<div class="turn lead"><div class="bubble">${esc(t.text)}</div></div>`;
+    const mis=t.expectedNodeId&&t.nodeId!==t.expectedNodeId;
+    const mine=COMMENTS.filter(c=>c.simId===sim.id&&c.turnIndex===i);
+    const cmts=mine.map(c=>`<div class="cmt"><span class="tag">${c.tag}</span> ${esc(c.text)}</div>`).join('');
+    return `<div class="turn setter"><div style="max-width:62%">
+      <div class="bubble ${mis?'mismatch':''}">${esc(t.text)}
+        <div class="nodeTag">▸ ${t.nodeId||'?'}${mis?` ⚠️ expected ${t.expectedNodeId}`:''}</div>
+        <div class="cbtn ${mine.length?'has':''}" onclick="compose('${sim.id}',${i},'${t.nodeId||''}')">💬</div>
+      </div>${cmts}<div id="comp-${i}"></div></div></div>`;
+  }).join('');
+  document.getElementById('chat').innerHTML=head+turns;
+}
+function compose(simId,i,nodeId){
+  const box=document.getElementById('comp-'+i); if(!box) return;
+  if(box.innerHTML){ box.innerHTML=''; return; }
+  box.innerHTML=`<div class="composer">
+    <textarea id="ctext-${i}" placeholder="Your note on this message / node ${nodeId}…"></textarea>
+    <div class="row"><select id="ctag-${i}">${TAGS.map(t=>`<option>${t}</option>`).join('')}</select>
+      <button class="btn active" onclick="saveComment('${simId}',${i},'${nodeId}')">Save note</button>
+      <button class="btn" onclick="compose('${simId}',${i},'${nodeId}')">Cancel</button></div></div>`;
+  document.getElementById('ctext-'+i).focus();
+}
+function saveComment(simId,i,nodeId){
+  const text=(document.getElementById('ctext-'+i).value||'').trim(); if(!text) return;
+  const tag=document.getElementById('ctag-'+i).value;
+  COMMENTS.push({id:'c_'+Date.now(),simId,turnIndex:i,nodeId,tag,text,author:'Michael',ts:Date.now()});
+  persistComments(); renderChat(); if(bankOpen) renderBank();
+}
+function mark(simId,status){ const s=SIMS.find(x=>x.id===simId); if(s){ s.status=status; persistSims(); renderList(); renderChat(); } }
+
+function persistComments(){ setStatus('saving…'); fetch('/api/sim-comments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({comments:COMMENTS})}).then(()=>setStatus('✓ saved')).catch(()=>setStatus('⚠️ save failed')); }
+function persistSims(){ fetch('/api/sims',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sims:SIMS})}).catch(()=>{}); }
+
+let bankOpen=false;
+function toggleBank(){ bankOpen=!bankOpen; document.getElementById('bank').style.display=bankOpen?'block':'none'; document.getElementById('bankToggle').classList.toggle('active',bankOpen); if(bankOpen) renderBank(); }
+function renderBank(){
+  // group comments by nodeId — THIS is the AI's study guide
+  const byNode={}; COMMENTS.forEach(c=>{ (byNode[c.nodeId]=byNode[c.nodeId]||[]).push(c); });
+  const keys=Object.keys(byNode).sort();
+  const body=keys.map(k=>`<div class="bankNode"><div class="nid">${k} <span class="ct">(${byNode[k].length})</span></div>
+     ${byNode[k].map(c=>`<div class="cmt"><span class="tag">${c.tag}</span> ${esc(c.text)} <span class="ct">· ${c.simId}</span></div>`).join('')}</div>`).join('');
+  document.getElementById('bank').innerHTML=`<h3>Comment Bank — grouped by node</h3>${body||'<div class="empty">No comments yet. Add notes on setter messages →</div>'}`;
+}
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+load();
+</script>
+</body>
+</html>

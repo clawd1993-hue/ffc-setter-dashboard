@@ -81,7 +81,7 @@ async function bootLoad() {
   if (!USE_DB) return;
   try {
     const rows = await sb(`${SB_TABLE}?select=id,data&order=updated.desc`);
-    db.conversations = (rows || []).filter(r => r.id !== FLOW_LAYOUT_ID).map(r => r.data).filter(Boolean);
+    db.conversations = (rows || []).filter(r => !String(r.id).startsWith('__')).map(r => r.data).filter(Boolean);
     console.log(`[db] loaded ${db.conversations.length} conversations from Supabase`);
   } catch (e) {
     console.error('[db] load failed, starting empty:', e.message);
@@ -593,6 +593,31 @@ app.post('/api/flow-layout', async (req, res) => {
   }
   res.json({ ok: true });
 });
+
+// ---- Simulation review dashboard: sims + the human comment bank (stored as special rows) ----
+const SIMS_ID = '__sims__';
+const SIM_COMMENTS_ID = '__sim_comments__';
+let simsMem = null, simCommentsMem = null;
+async function getSpecial(id, memFallback) {
+  if (USE_DB) {
+    try { const rows = await sb(`${SB_TABLE}?id=eq.${id}&select=data`); return (rows && rows[0] && rows[0].data && rows[0].data.payload) || memFallback || null; }
+    catch (e) { return memFallback || null; }
+  }
+  return memFallback || null;
+}
+async function putSpecial(id, name, payload) {
+  if (USE_DB) {
+    try { await sb(`${SB_TABLE}?on_conflict=id`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ id, subscriber_id: '', name, updated: Date.now(), data: { payload } }) }); } catch (e) { return { ok: true, mem: true, dbWarn: e.message }; }
+  }
+  return { ok: true };
+}
+// the 100 simulated transcripts (generated offline, loaded here for review)
+app.get('/api/sims', async (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ sims: await getSpecial(SIMS_ID, simsMem) || [] }); });
+app.post('/api/sims', async (req, res) => { const sims = req.body && req.body.sims; if (!Array.isArray(sims)) return res.status(400).json({ error: 'no sims[]' }); simsMem = sims; res.json(await putSpecial(SIMS_ID, '(sims)', sims)); });
+// the human comment bank — keyed by simId + turnIndex + nodeId so the AI can group feedback per tree node
+app.get('/api/sim-comments', async (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ comments: await getSpecial(SIM_COMMENTS_ID, simCommentsMem) || [] }); });
+app.post('/api/sim-comments', async (req, res) => { const comments = req.body && req.body.comments; if (!Array.isArray(comments)) return res.status(400).json({ error: 'no comments[]' }); simCommentsMem = comments; res.json(await putSpecial(SIM_COMMENTS_ID, '(sim comments)', comments)); });
 
 // 4) hand off to a SAVED ManyChat flow (booking/qualify/etc) — sendFlow
 app.post('/api/fire-flow', async (req, res) => {
