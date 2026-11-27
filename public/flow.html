@@ -944,6 +944,7 @@ function wireInteractions(){
       tempPath.setAttribute('fill','none');tempPath.setAttribute('stroke','#0A84FF');
       tempPath.setAttribute('stroke-width','2');tempPath.setAttribute('stroke-dasharray','5 4');
       tempPath.setAttribute('marker-end','url(#arrow)');
+      tempPath.style.pointerEvents='none'; // never let the line being drawn block the drop target
       svg.appendChild(tempPath);
       canvas.setPointerCapture(ev.pointerId);
     });
@@ -981,8 +982,11 @@ document.addEventListener('pointerup',ev=>{
     else savePositions();     // a real drag → auto-save the layout
   }
   if(link){
-    const over=document.elementFromPoint(ev.clientX,ev.clientY);
-    const tgt=over&&over.closest('.node');
+    if(tempPath){tempPath.remove();tempPath=null;} // remove the drag line FIRST so it can't be the hit target
+    // find the first real .node under the cursor, skipping wires/labels/overlays
+    let tgt=null;
+    const stack=document.elementsFromPoint(ev.clientX,ev.clientY);
+    for(const el of stack){ const n=el.closest&&el.closest('.node'); if(n){ tgt=n; break; } }
     if(tgt&&tgt.dataset.id!==link.from){
       // dropped on an existing bubble → connect to it
       const to=tgt.dataset.id;
@@ -1001,7 +1005,6 @@ document.addEventListener('pointerup',ev=>{
       renderNodes(); try{ wireInteractions(); }catch(e){}
       savePositions();
     }
-    if(tempPath){tempPath.remove();tempPath=null;}
     link=null; drawWires();
   }
 });
