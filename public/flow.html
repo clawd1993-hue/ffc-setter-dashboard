@@ -881,16 +881,20 @@ function addNode(){
   nodes.push({id, x:board.scrollLeft+500, y:board.scrollTop+160, title:'New bubble', steps:[{t:'msg',text:'New message bubble.'}]});
   renderNodes(); drawWires();
 }
-function resetView(){
+function resetView(smooth=true){
   const board=document.getElementById('board');
-  // center the top node horizontally
-  const left=1795-board.clientWidth/2;
-  board.scrollTo({left:Math.max(0,left),top:0,behavior:'smooth'});
+  if(!nodes.length){ board.scrollTo({left:0,top:0}); return; }
+  // find the entry (top-most) node and center the view on it, scrolled to the top
+  let top=nodes[0]; nodes.forEach(n=>{ if(n.y<top.y) top=n; });
+  const cx=(top.x+115)*zoom;                 // node is 230px wide → horizontal centre = x+115
+  const left=cx-board.clientWidth/2;
+  const topY=Math.max(0,(top.y-50)*zoom);    // a little headroom above the first bubble
+  board.scrollTo({left:Math.max(0,left),top:topY,behavior:smooth?'smooth':'auto'});
 }
 
 function boot(){
   try { seed(); } catch(err){ document.querySelector('.topbar .sub').textContent='INIT ERROR: '+err.message; console.error(err); }
-  resetView();
+  resetView(false); // start centered at the top, instantly
 }
 // load the SHARED layout from the backend first (so every setter sees the same arrangement),
 // fall back to this browser's local cache if the request fails.
