@@ -132,6 +132,7 @@
     <button class="btn" id="saveBtn" onclick="saveNow()" title="Save now (⌘S)">💾 Save</button>
     <span id="saveStatus" class="savestatus saved" title="Save state">✓ Saved</span>
     <span id="counts" style="font-size:12px;color:var(--muted);min-width:120px;"></span>
+    <button class="btn" onclick="exportTree()" title="Export the resolved tree for the simulator">⬇ Export tree</button>
     <button class="btn" onclick="addButton()">+ Add button</button>
     <button class="btn primary" onclick="addNode()">+ Add bubble</button>
   </div>
@@ -683,6 +684,19 @@ function savePositions(){ // called after every change → debounce, with instan
   clearTimeout(saveTimer); saveTimer=setTimeout(flushSave,500);
 }
 function saveNow(){ flushSave(); } // manual flush, immediate
+// export the resolved tree (nodes + edges + hard rules) for the OFFLINE simulator (never touches ManyChat)
+function exportTree(){
+  const tree={
+    nodes:nodes.map(n=>({id:n.id,kind:n.kind||'bubble',title:n.title||'',steps:n.steps||(n.text?[{t:'msg',text:n.text}]:[])})),
+    edges:edges.map(e=>({from:e.from,to:e.to,label:e.label||''})),
+    rules:hardRules.slice(),
+    exportedAt:Date.now()
+  };
+  setSaveStatus('Exporting…','saving');
+  fetch('/api/sim-tree',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tree})})
+    .then(r=>{ if(!r.ok) throw 0; setSaveStatus('✓ Tree exported '+hhmm(),'saved'); })
+    .catch(()=>setSaveStatus('⚠️ Export failed','err'));
+}
 function undo(){
   if(!undoStack.length) return;
   const prev=undoStack.pop(); persistUndo();

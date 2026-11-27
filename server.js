@@ -616,6 +616,11 @@ async function putSpecial(id, name, payload) {
 app.get('/api/sims', async (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ sims: await getSpecial(SIMS_ID, simsMem) || [] }); });
 app.post('/api/sims', async (req, res) => { const sims = req.body && req.body.sims; if (!Array.isArray(sims)) return res.status(400).json({ error: 'no sims[]' }); simsMem = sims; res.json(await putSpecial(SIMS_ID, '(sims)', sims)); });
 // the human comment bank — keyed by simId + turnIndex + nodeId so the AI can group feedback per tree node
+// the resolved script tree exported from the whiteboard (flow.html "Export tree") → feeds the sim generator
+const SIM_TREE_ID = '__sim_tree__';
+let simTreeMem = null;
+app.get('/api/sim-tree', async (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ tree: await getSpecial(SIM_TREE_ID, simTreeMem) || null }); });
+app.post('/api/sim-tree', async (req, res) => { const tree = req.body && req.body.tree; if (!tree || typeof tree !== 'object') return res.status(400).json({ error: 'no tree' }); simTreeMem = tree; res.json(await putSpecial(SIM_TREE_ID, '(sim tree)', tree)); });
 app.get('/api/sim-comments', async (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ comments: await getSpecial(SIM_COMMENTS_ID, simCommentsMem) || [] }); });
 app.post('/api/sim-comments', async (req, res) => { const comments = req.body && req.body.comments; if (!Array.isArray(comments)) return res.status(400).json({ error: 'no comments[]' }); simCommentsMem = comments; res.json(await putSpecial(SIM_COMMENTS_ID, '(sim comments)', comments)); });
 
