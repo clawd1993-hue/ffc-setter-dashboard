@@ -423,6 +423,9 @@ function seed(){
     {id:'t2b_book', x:440, y:7500, title:'➡️ 2B · Book the call', steps:[
       {t:'msg', text:"Perfect \ud83d\ude4c Here's the link, it takes only 2 minutes to register. Grab a time this week you know you'll make \ud83d\udc47"},
       {t:'flow', name:'Booking Link'}]},
+    {id:'t2b_book2', x:620, y:6060, title:'➡️ 2B · Book the call', steps:[
+      {t:'msg', text:"Perfect \ud83d\ude4c Here's the link, it takes only 2 minutes to register. Grab a time this week you know you'll make \ud83d\udc47"},
+      {t:'flow', name:'Booking Link'}]},
     {id:'t2b_no', x:880, y:7500, title:'🟡 2B · No (now it\'s the money)', steps:[
       {t:'msg', text:"Got it. One last thing, if the investment wasn't a factor at all, would you actually want to do this?"}]},
     {id:'t2b_nono', x:880, y:7780, kind:'route', title:'Their answer?'},
@@ -560,7 +563,7 @@ function seed(){
     {from:'rt_2b1', to:'t2b_proof', label:'value first'},
     {from:'rt_2b1', to:'y_2b_msg2',  label:'only the investment'},
     {from:'y_2b_msg2', to:'rt_2b2'},
-    {from:'rt_2b2', to:'t2b_book', label:'yes'},
+    {from:'rt_2b2', to:'t2b_book2', label:'yes'},
     {from:'rt_2b2', to:'y_2b_msg3', label:'no'},
     {from:'y_2b_msg3', to:'rt_2b3'},
     {from:'rt_2b3', to:'t2b_book', label:'clear yes'},
