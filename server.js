@@ -371,6 +371,21 @@ ${MAIN_SCRIPT}`,
 // ---------- server ----------
 const app = express();
 app.use(express.json());
+
+// --- password gate: protects the UI + all data APIs; leaves machine webhooks OPEN ---
+// (gating /manychat/* or /ingest/tg would break live lead capture)
+const GATE_PW = process.env.GATE_PW || '353535';
+const GATE_OPEN = ['/manychat/', '/ingest/', '/health', '/tg-file/'];
+app.use((req, res, next) => {
+  if (GATE_OPEN.some(p => req.path.startsWith(p))) return next();
+  const h = req.headers.authorization || '';
+  if (h.startsWith('Basic ')) {
+    const pass = Buffer.from(h.slice(6), 'base64').toString().split(':').slice(1).join(':');
+    if (pass === GATE_PW) return next();
+  }
+  res.set('WWW-Authenticate', 'Basic realm="FFC Setter"').status(401).send('Password required.');
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // DEBUG: ring buffer of the last raw inbound payloads (to discover what ManyChat sends on media)
