@@ -97,8 +97,8 @@
     <button class="btn primary" onclick="addNode()">+ Add bubble</button>
   </div>
 
-  <div id="rules">
-    <div class="rhead" onclick="toggleRules()"><span>⚑ Hard Rules</span><span class="rcount" id="rcount"></span><span id="rchev">▾</span></div>
+  <div id="rules" class="collapsed">
+    <div class="rhead" onclick="toggleRules()"><span>⚑ Hard Rules</span><span class="rcount" id="rcount"></span><span id="rchev">▸</span></div>
     <div class="rbody">
       <ul id="rlist"></ul>
       <div class="radd">
@@ -147,9 +147,12 @@ function delRule(i){
 }
 function toggleRules(){
   const box=document.getElementById('rules'); box.classList.toggle('collapsed');
-  document.getElementById('rchev').textContent = box.classList.contains('collapsed') ? '▸' : '▾';
+  const col=box.classList.contains('collapsed');
+  document.getElementById('rchev').textContent = col ? '▸' : '▾';
+  try{ localStorage.setItem('rulesCollapsed', col?'1':'0'); }catch(e){}
 }
 document.addEventListener('DOMContentLoaded',()=>{
+  try{ if(localStorage.getItem('rulesCollapsed')==='0'){ const b=document.getElementById('rules'); b.classList.remove('collapsed'); document.getElementById('rchev').textContent='▾'; } }catch(e){}
   renderRules();
   const t=document.getElementById('rinput');
   if(t) t.addEventListener('keydown',ev=>{ if((ev.metaKey||ev.ctrlKey)&&ev.key==='Enter'){ ev.preventDefault(); addRule(); } });
