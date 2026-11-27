@@ -61,6 +61,26 @@
   .port.out{bottom:-9px;}
   .hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#1C2B3A;color:#fff;
     font-size:12px;padding:7px 14px;border-radius:20px;opacity:.9;z-index:20;}
+  /* Hard Rules sticky note (pinned top-left, stays on screen) */
+  #rules{position:fixed;top:62px;left:12px;width:270px;z-index:30;background:#FFF9E6;border:1px solid #EAD98C;
+    border-radius:12px;box-shadow:0 6px 20px rgba(60,50,10,.14);font-size:12.5px;overflow:hidden;}
+  #rules .rhead{display:flex;align-items:center;gap:7px;padding:9px 11px;background:#FBEFBF;border-bottom:1px solid #EAD98C;
+    cursor:pointer;user-select:none;font-weight:800;color:#6B5A10;}
+  #rules .rhead .rcount{margin-left:auto;font-weight:700;color:#9A861F;font-size:11px;}
+  #rules.collapsed .rbody{display:none;}
+  #rules .rbody{padding:7px 9px 10px;max-height:52vh;overflow:auto;}
+  #rules ul{list-style:none;margin:0 0 7px;padding:0;}
+  #rules li{display:flex;gap:7px;align-items:flex-start;padding:5px 4px;border-bottom:1px dashed #ECE0AE;line-height:1.35;color:#4A431F;}
+  #rules li .bullet{color:#C9A227;font-weight:800;flex:0 0 auto;}
+  #rules li .rtext{flex:1;white-space:pre-wrap;word-break:break-word;}
+  #rules li .rdel{flex:0 0 auto;cursor:pointer;color:#B9A14A;font-weight:800;opacity:.6;}
+  #rules li .rdel:hover{opacity:1;color:#C0392B;}
+  #rules .radd{display:flex;gap:6px;}
+  #rules textarea{flex:1;resize:vertical;min-height:34px;max-height:120px;border:1px solid #E2D084;border-radius:8px;
+    padding:6px 8px;font:inherit;font-size:12px;background:#fff;color:#4A431F;}
+  #rules .raddbtn{border:none;background:#D9B21E;color:#fff;font-weight:800;border-radius:8px;padding:0 12px;cursor:pointer;}
+  #rules .raddbtn:hover{filter:brightness(.95);}
+  #rules .rempty{color:#A2924A;padding:4px;font-style:italic;}
 </style>
 </head>
 <body>
@@ -75,6 +95,17 @@
     <button class="btn" onclick="resetView()">Reset view</button>
     <button class="btn" onclick="resetLayout()" title="Clear your saved drags, back to default layout">Reset layout</button>
     <button class="btn primary" onclick="addNode()">+ Add bubble</button>
+  </div>
+
+  <div id="rules">
+    <div class="rhead" onclick="toggleRules()"><span>⚑ Hard Rules</span><span class="rcount" id="rcount"></span><span id="rchev">▾</span></div>
+    <div class="rbody">
+      <ul id="rlist"></ul>
+      <div class="radd">
+        <textarea id="rinput" placeholder="New hard rule…  (⌘/Ctrl+Enter)"></textarea>
+        <button class="raddbtn" onclick="addRule()">+</button>
+      </div>
+    </div>
   </div>
 
   <div id="board">
@@ -94,6 +125,35 @@
 const canvas=document.getElementById('canvas');
 const svg=document.getElementById('wires');
 let nodes=[], edges=[], uid=1, zoom=1;
+let hardRules=[];
+
+// ⚑ Hard Rules sticky note — standing rules for the AI / flow, shared across setters
+function renderRules(){
+  const ul=document.getElementById('rlist'); if(!ul) return;
+  document.getElementById('rcount').textContent = hardRules.length ? hardRules.length : '';
+  if(!hardRules.length){ ul.innerHTML='<li class="rempty">No rules yet — add one below.</li>'; return; }
+  ul.innerHTML = hardRules.map((r,i)=>
+    `<li><span class="bullet">•</span><span class="rtext">${esc(r)}</span><span class="rdel" onclick="delRule(${i})" title="Delete">✕</span></li>`
+  ).join('');
+}
+function addRule(){
+  const t=document.getElementById('rinput'); const v=(t.value||'').trim();
+  if(!v) return;
+  hardRules.push(v); t.value='';
+  renderRules(); savePositions();           // persists in the shared layout row
+}
+function delRule(i){
+  hardRules.splice(i,1); renderRules(); savePositions();
+}
+function toggleRules(){
+  const box=document.getElementById('rules'); box.classList.toggle('collapsed');
+  document.getElementById('rchev').textContent = box.classList.contains('collapsed') ? '▸' : '▾';
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  renderRules();
+  const t=document.getElementById('rinput');
+  if(t) t.addEventListener('keydown',ev=>{ if((ev.metaKey||ev.ctrlKey)&&ev.key==='Enter'){ ev.preventDefault(); addRule(); } });
+});
 
 // ---- zoom ----
 function setZoom(z){
@@ -502,7 +562,7 @@ function currentLayout(){
   const pos={}; nodes.forEach(n=>{ pos[n.id]={x:n.x,y:n.y}; });
   const mids={}; edges.forEach(e=>{ if(e.mid) mids[e.from+'>'+e.to]={x:e.mid.x,y:e.mid.y}; });
   const reviewed=nodes.filter(n=>n.reviewed).map(n=>n.id);
-  return {pos,mids,reviewed};
+  return {pos,mids,reviewed,rules:hardRules};
 }
 function savePositions(){
   const layout=currentLayout();
@@ -516,12 +576,13 @@ function applyLayout(layout){
   nodes.forEach(n=>{ if(pos[n.id]){ n.x=pos[n.id].x; n.y=pos[n.id].y; } });
   edges.forEach(e=>{ const k=e.from+'>'+e.to; if(mids[k]) e.mid=mids[k]; });
   const rev=layout.reviewed||[]; if(rev.length){ const set=new Set(rev); nodes.forEach(n=>{ n.reviewed=set.has(n.id); }); }
+  if(Array.isArray(layout.rules)){ hardRules=layout.rules.slice(); renderRules(); }
 }
 function applySavedPositions(){ applyLayout(SAVED_LAYOUT); }
 function resetLayout(){
   if(confirm('Reset all bubbles back to the default layout for EVERYONE? (clears the shared saved layout)')){
     localStorage.removeItem('flowPos');
-    fetch('/api/flow-layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layout:{pos:{},mids:{}}})}).finally(()=>location.reload());
+    fetch('/api/flow-layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layout:{pos:{},mids:{},rules:hardRules}})}).finally(()=>location.reload());
   }
 }
 
