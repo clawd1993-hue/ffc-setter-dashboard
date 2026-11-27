@@ -118,6 +118,7 @@
     <button class="btn" onclick="resetView()">Reset view</button>
     <button class="btn" onclick="resetLayout()" title="Clear your saved drags, back to default layout">Reset layout</button>
     <button class="btn" id="undoBtn" onclick="undo()" title="Undo last change (⌘Z)">↶ Undo</button>
+    <button class="btn" id="saveBtn" onclick="saveNow()" title="Save now (⌘S)">💾 Save</button>
     <button class="btn" onclick="addButton()">+ Add button</button>
     <button class="btn primary" onclick="addNode()">+ Add bubble</button>
   </div>
@@ -653,6 +654,18 @@ function savePositions(){
   clearTimeout(saveTimer);                                                   // debounce the shared save
   saveTimer=setTimeout(()=>{ fetch('/api/flow-layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layout})}).catch(()=>{}); }, 500);
 }
+function saveNow(){
+  clearTimeout(saveTimer); // cancel the pending debounce, flush immediately
+  const layout=currentLayout();
+  const json=JSON.stringify(layout);
+  if(lastSnapshot!==null && lastSnapshot!==json){ undoStack.push(lastSnapshot); if(undoStack.length>50) undoStack.shift(); persistUndo(); updateUndoBtn(); }
+  lastSnapshot=json;
+  try{ localStorage.setItem('flowPos', json); }catch(e){}
+  const b=document.getElementById('saveBtn'); if(b) b.textContent='Saving…';
+  fetch('/api/flow-layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layout})})
+    .then(()=>{ if(b){ b.textContent='✓ Saved'; setTimeout(()=>{ b.textContent='💾 Save'; },1400); } })
+    .catch(()=>{ if(b){ b.textContent='⚠️ Retry'; setTimeout(()=>{ b.textContent='💾 Save'; },1800); } });
+}
 function undo(){
   if(!undoStack.length) return;
   const prev=undoStack.pop(); persistUndo();
@@ -1011,6 +1024,7 @@ function boot(){
 }
 document.addEventListener('keydown',ev=>{
   if((ev.metaKey||ev.ctrlKey) && (ev.key==='z'||ev.key==='Z') && !ev.shiftKey && !editing){ ev.preventDefault(); undo(); }
+  if((ev.metaKey||ev.ctrlKey) && (ev.key==='s'||ev.key==='S')){ ev.preventDefault(); saveNow(); }
 });
 // load the SHARED layout from the backend first (so every setter sees the same arrangement),
 // fall back to this browser's local cache if the request fails.
