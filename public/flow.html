@@ -41,9 +41,15 @@
   .node .body{padding:11px 12px 13px;font-size:14px;line-height:1.4;color:var(--ink);}
   .stepflow{background:#EAF3FF;border:1px solid #BFDBFF;color:#1B63C4;border-radius:8px;padding:6px 9px;
     font-size:12px;font-weight:700;margin-bottom:7px;}
-  .stepmsg{background:#F7F9FB;border:1px solid #EAEEF2;border-radius:8px;padding:7px 9px;font-size:13px;
+  .stepmsg{position:relative;background:#F7F9FB;border:1px solid #EAEEF2;border-radius:8px;padding:7px 9px;font-size:13px;
     line-height:1.38;margin-bottom:7px;}
   .stepflow:last-child,.stepmsg:last-child{margin-bottom:0;}
+  .stepmsg .pencil{position:absolute;top:3px;right:4px;font-size:11px;cursor:pointer;opacity:0;transition:opacity .12s;
+    background:#fff;border:1px solid #E3E9EF;border-radius:6px;padding:1px 3px;line-height:1;}
+  .stepmsg:hover .pencil{opacity:.75;}
+  .stepmsg .pencil:hover{opacity:1;background:#EAF3FF;border-color:#BFDBFF;}
+  .stepmsg .smtext{display:block;white-space:pre-wrap;}
+  .stepmsg .smtext[contenteditable="true"]{outline:2px solid var(--blue);background:#fff;border-radius:5px;padding:3px 4px;cursor:text;}
   /* reviewed = logic checked & done */
   .node.reviewed{background:#E7F7EC;border-color:#A7E0BA;}
   .rev-toggle{position:absolute;top:7px;right:8px;width:18px;height:18px;border-radius:50%;border:1.5px solid #CBD5E0;
@@ -126,6 +132,11 @@ const canvas=document.getElementById('canvas');
 const svg=document.getElementById('wires');
 let nodes=[], edges=[], uid=1, zoom=1;
 let hardRules=[];
+let editing=null; // the .smtext element currently being edited
+let textEdits={};  // { nodeId: { stepIndex: "overridden text" } } — shared script tweaks
+
+// normalize any message bubble to a steps[] array so each text block is addressable/editable
+function ensureSteps(n){ if(!n.steps) n.steps=[{t:'msg',text:n.text||''}]; return n.steps; }
 
 // ⚑ Hard Rules sticky note — standing rules for the AI / flow, shared across setters
 function renderRules(){
@@ -151,6 +162,39 @@ function toggleRules(){
   document.getElementById('rchev').textContent = col ? '▸' : '▾';
   try{ localStorage.setItem('rulesCollapsed', col?'1':'0'); }catch(e){}
 }
+// ✏️ inline edit a single text block's script copy (persists + shared)
+function startEdit(id,si,txt){
+  if(!txt) return;
+  if(editing && editing!==txt) editing.blur();
+  const n=nodeById(id); const st=ensureSteps(n);
+  editing=txt;
+  txt.setAttribute('contenteditable','true');
+  txt.dataset.orig=(st[si]&&st[si].text)||'';
+  txt.focus();
+  const r=document.createRange(); r.selectNodeContents(txt);
+  const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  const onKey=ev=>{
+    ev.stopPropagation();
+    if(ev.key==='Enter' && !ev.shiftKey){ ev.preventDefault(); txt.blur(); }
+    else if(ev.key==='Escape'){ ev.preventDefault(); txt.textContent=txt.dataset.orig; txt.blur(); }
+  };
+  const onBlur=()=>{ txt.removeEventListener('keydown',onKey); txt.removeEventListener('blur',onBlur); commitEdit(id,si,txt); };
+  txt.addEventListener('keydown',onKey);
+  txt.addEventListener('blur',onBlur);
+}
+function commitEdit(id,si,txt){
+  const val=(txt.innerText||'').replace(/\u00a0/g,' ').replace(/\s+$/,'');
+  txt.removeAttribute('contenteditable'); editing=null;
+  const n=nodeById(id); if(!n){ return; }
+  const st=ensureSteps(n);
+  if(st[si] && st[si].t!=='flow' && val!==st[si].text){
+    st[si].text=val;
+    textEdits[id]=textEdits[id]||{}; textEdits[id][si]=val;
+    savePositions(); // persists script edits in the shared layout row
+  }
+  renderNodes(); drawWires(); try{ wireInteractions(); }catch(e){}
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
   try{ if(localStorage.getItem('rulesCollapsed')==='0'){ const b=document.getElementById('rules'); b.classList.remove('collapsed'); document.getElementById('rchev').textContent='▾'; } }catch(e){}
   renderRules();
@@ -565,7 +609,7 @@ function currentLayout(){
   const pos={}; nodes.forEach(n=>{ pos[n.id]={x:n.x,y:n.y}; });
   const mids={}; edges.forEach(e=>{ if(e.mid) mids[e.from+'>'+e.to]={x:e.mid.x,y:e.mid.y}; });
   const reviewed=nodes.filter(n=>n.reviewed).map(n=>n.id);
-  return {pos,mids,reviewed,rules:hardRules};
+  return {pos,mids,reviewed,rules:hardRules,edits:textEdits};
 }
 function savePositions(){
   const layout=currentLayout();
@@ -580,12 +624,17 @@ function applyLayout(layout){
   edges.forEach(e=>{ const k=e.from+'>'+e.to; if(mids[k]) e.mid=mids[k]; });
   const rev=layout.reviewed||[]; if(rev.length){ const set=new Set(rev); nodes.forEach(n=>{ n.reviewed=set.has(n.id); }); }
   if(Array.isArray(layout.rules)){ hardRules=layout.rules.slice(); renderRules(); }
+  if(layout.edits && typeof layout.edits==='object'){
+    textEdits=layout.edits;
+    Object.keys(textEdits).forEach(id=>{ const n=nodeById(id); if(!n) return; const st=ensureSteps(n);
+      Object.keys(textEdits[id]).forEach(si=>{ if(st[si] && st[si].t!=='flow') st[si].text=textEdits[id][si]; }); });
+  }
 }
 function applySavedPositions(){ applyLayout(SAVED_LAYOUT); }
 function resetLayout(){
   if(confirm('Reset all bubbles back to the default layout for EVERYONE? (clears the shared saved layout)')){
     localStorage.removeItem('flowPos');
-    fetch('/api/flow-layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layout:{pos:{},mids:{},rules:hardRules}})}).finally(()=>location.reload());
+    fetch('/api/flow-layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layout:{pos:{},mids:{},rules:hardRules,edits:textEdits}})}).finally(()=>location.reload());
   }
 }
 
@@ -607,10 +656,10 @@ function renderNodes(){
         <div class="routelabel">${esc(n.title)}</div>
         <div class="port out" data-port="out"></div>`;
     } else {
-      const steps=n.steps||[{t:'msg',text:n.text||''}];
-      const body=steps.map(s=> s.t==='flow'
+      const steps=ensureSteps(n);
+      const body=steps.map((s,si)=> s.t==='flow'
         ? `<div class="stepflow">⚡ ${esc(s.name)}</div>`
-        : `<div class="stepmsg">${esc(s.text)}</div>`).join('');
+        : `<div class="stepmsg" data-si="${si}"><span class="smtext">${esc(s.text)}</span><span class="pencil" title="Edit this text">✏️</span></div>`).join('');
       el.innerHTML=`
         ${revBtn}
         <div class="port in" data-port="in"></div>
@@ -738,9 +787,21 @@ function wireInteractions(){
         savePositions(); // persists reviewed[] in the shared layout
       });
     }
+    // ✏️ pencil per text block → inline-edit that step's script copy
+    el.querySelectorAll('.stepmsg').forEach(sm=>{
+      const si=+sm.dataset.si;
+      const pen=sm.querySelector('.pencil');
+      const txt=sm.querySelector('.smtext');
+      if(pen) pen.addEventListener('pointerdown',ev=>ev.stopPropagation());
+      if(pen) pen.addEventListener('click',ev=>{ ev.stopPropagation(); startEdit(id,si,txt); });
+      // let the user click into the text to position the caret without starting a drag (while editing)
+      if(txt) txt.addEventListener('pointerdown',ev=>{ if(txt.getAttribute('contenteditable')==='true') ev.stopPropagation(); });
+    });
     el.addEventListener('pointerdown',ev=>{
       if(ev.target.classList.contains('port')) return; // handled below
       if(ev.target.classList.contains('rev-toggle')) return; // review toggle, not a drag
+      if(ev.target.classList.contains('pencil')) return; // edit pencil, not a drag
+      if(editing) return; // don't drag while editing a text block
       const n=nodeById(id); const p=toCanvas(ev.clientX,ev.clientY);
       drag={id,dx:p.x-n.x,dy:p.y-n.y,el,sx:ev.clientX,sy:ev.clientY};
       el.classList.add('drag'); el.setPointerCapture(ev.pointerId);
