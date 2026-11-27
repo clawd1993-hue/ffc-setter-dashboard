@@ -137,6 +137,7 @@ let nodes=[], edges=[], uid=1, zoom=1;
 let hardRules=[];
 let editing=null; // the .smtext element currently being edited
 let textEdits={};  // { nodeId: { stepIndex: "overridden text" } } — shared script tweaks
+let removedEdges=[]; // keys "from>to" of seed edges the user deleted (persisted)
 
 // normalize any message bubble to a steps[] array so each text block is addressable/editable
 function ensureSteps(n){ if(!n.steps) n.steps=[{t:'msg',text:n.text||''}]; return n.steps; }
@@ -615,7 +616,11 @@ function currentLayout(){
   const pos={}; nodes.forEach(n=>{ pos[n.id]={x:n.x,y:n.y}; });
   const mids={}; edges.forEach(e=>{ if(e.mid) mids[e.from+'>'+e.to]={x:e.mid.x,y:e.mid.y}; });
   const reviewed=nodes.filter(n=>n.reviewed).map(n=>n.id);
-  return {pos,mids,reviewed,rules:hardRules,edits:textEdits};
+  // user-created blocks + arrows (so they survive refresh)
+  const addedNodes=nodes.filter(n=>n._added).map(n=>({id:n.id,x:n.x,y:n.y,title:n.title,kind:n.kind,steps:n.steps,text:n.text}));
+  const addedEdges=edges.filter(e=>e._added).map(e=>({from:e.from,to:e.to,label:e.label||''}));
+  const edgeLabels={}; edges.forEach(e=>{ if(e._labelEdited && !e._added) edgeLabels[e.from+'>'+e.to]=e.label||''; });
+  return {pos,mids,reviewed,rules:hardRules,edits:textEdits,addedNodes,addedEdges,removedEdges,edgeLabels};
 }
 function savePositions(){
   const layout=currentLayout();
@@ -630,6 +635,14 @@ function applyLayout(layout){
   edges.forEach(e=>{ const k=e.from+'>'+e.to; if(mids[k]) e.mid=mids[k]; });
   const rev=layout.reviewed||[]; if(rev.length){ const set=new Set(rev); nodes.forEach(n=>{ n.reviewed=set.has(n.id); }); }
   if(Array.isArray(layout.rules)){ hardRules=layout.rules.slice(); renderRules(); }
+  // re-add user-created blocks first (edges may reference them)
+  (layout.addedNodes||[]).forEach(n=>{ if(!nodeById(n.id)){ n._added=true; nodes.push(n); } });
+  (layout.addedEdges||[]).forEach(se=>{ if(!edges.some(e=>e.from===se.from&&e.to===se.to)) edges.push({from:se.from,to:se.to,label:se.label||'',_added:true}); });
+  // re-apply deletions of seed edges
+  removedEdges=(layout.removedEdges||[]).slice();
+  removedEdges.forEach(k=>{ const p=k.split('>'); const idx=edges.findIndex(e=>e.from===p[0]&&e.to===p[1]); if(idx>=0) edges.splice(idx,1); });
+  // re-apply label changes on seed edges
+  if(layout.edgeLabels){ Object.keys(layout.edgeLabels).forEach(k=>{ const p=k.split('>'); const e=edges.find(e=>e.from===p[0]&&e.to===p[1]); if(e){ e.label=layout.edgeLabels[k]; e._labelEdited=true; } }); }
   if(layout.edits && typeof layout.edits==='object'){
     textEdits=layout.edits;
     Object.keys(textEdits).forEach(id=>{ const n=nodeById(id); if(!n) return; const st=ensureSteps(n);
@@ -640,7 +653,8 @@ function applySavedPositions(){ applyLayout(SAVED_LAYOUT); }
 function resetLayout(){
   if(confirm('Reset all bubbles back to the default layout for EVERYONE? (clears the shared saved layout)')){
     localStorage.removeItem('flowPos');
-    fetch('/api/flow-layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layout:{pos:{},mids:{},rules:hardRules,edits:textEdits}})}).finally(()=>location.reload());
+    const L=currentLayout(); L.pos={}; L.mids={}; // clear only positions/arcs, keep content
+    fetch('/api/flow-layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layout:L})}).finally(()=>location.reload());
   }
 }
 
@@ -770,12 +784,22 @@ function focusNode(id){
     if(p<1) focusAnim=requestAnimationFrame(step); else focusAnim=null;
   })(t0);
 }
+// pop-up asked whenever a NEW arrow is created → label it (button text / Yes / No / blank)
+function askArrowLabel(){
+  const v=prompt('Label this arrow — e.g. a button, Yes / No, or a branch name.\n(Leave blank for no label.)','');
+  return v===null ? '' : v.trim();
+}
 function editEdge(i){
   const e=edges[i]; if(!e)return;
   const v=prompt('Branch label (e.g. Yes / No / Green).\nType "x" to delete this arrow.', e.label||'');
   if(v===null)return;
-  if(v.trim().toLowerCase()==='x'){edges.splice(i,1);} else {e.label=v.trim();}
-  drawWires();
+  if(v.trim().toLowerCase()==='x'){
+    if(!e._added) removedEdges.push(e.from+'>'+e.to); // remember seed-edge deletion
+    edges.splice(i,1);
+  } else {
+    e.label=v.trim(); e._labelEdited=true;
+  }
+  drawWires(); savePositions();
 }
 
 // ---- interactions: drag nodes + draw connections ----
@@ -863,14 +887,20 @@ document.addEventListener('pointerup',ev=>{
     if(tgt&&tgt.dataset.id!==link.from){
       // dropped on an existing bubble → connect to it
       const to=tgt.dataset.id;
-      if(!edges.some(e=>e.from===link.from&&e.to===to)) edges.push({from:link.from,to});
+      if(!edges.some(e=>e.from===link.from&&e.to===to)){
+        const lbl=askArrowLabel();
+        edges.push({from:link.from,to,label:lbl,_added:true});
+        savePositions();
+      }
     } else if(!tgt){
       // dropped on empty canvas → SPAWN a new branch bubble here and connect
       const pt=toCanvas(ev.clientX,ev.clientY);
       const id='n'+(uid++);
-      nodes.push({id, x:pt.x-115, y:pt.y-10, title:'New bubble', steps:[{t:'msg',text:'New message bubble.'}]});
-      edges.push({from:link.from,to:id});
-      renderNodes();
+      const lbl=askArrowLabel();
+      nodes.push({id, x:pt.x-115, y:pt.y-10, title:'New bubble', steps:[{t:'msg',text:'New message bubble.'}], _added:true});
+      edges.push({from:link.from,to:id,label:lbl,_added:true});
+      renderNodes(); try{ wireInteractions(); }catch(e){}
+      savePositions();
     }
     if(tempPath){tempPath.remove();tempPath=null;}
     link=null; drawWires();
@@ -885,8 +915,10 @@ function toCanvas(cx,cy){
 function addNode(){
   const id='n'+(uid++);
   const board=document.getElementById('board');
-  nodes.push({id, x:board.scrollLeft+500, y:board.scrollTop+160, title:'New bubble', steps:[{t:'msg',text:'New message bubble.'}]});
-  renderNodes(); drawWires();
+  const x=(board.scrollLeft+500)/zoom, y=(board.scrollTop+160)/zoom;
+  nodes.push({id, x, y, title:'New bubble', steps:[{t:'msg',text:'New message bubble.'}], _added:true});
+  renderNodes(); drawWires(); try{ wireInteractions(); }catch(e){}
+  savePositions();
 }
 function resetView(smooth=true){
   const board=document.getElementById('board');
