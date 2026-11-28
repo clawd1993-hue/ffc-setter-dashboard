@@ -844,6 +844,14 @@ async function runOneSim(idx, avatar, style, curveball, brain) {
 }
 
 app.get('/api/sim-run', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(simRunStatus); });
+// debug: run ONE suggestV2 step positioned at a given node, surface any thrown error
+app.get('/api/sim-debug', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const nodeId = req.query.node || 'b_w';
+  const c = { messages: [{ dir: 'out', text: 'prev', t: 1 }, { dir: 'in', text: req.query.say || 'honestly im just broke, bills piling up and need money fast', t: 2 }], nodeId, mode: 'approve', leadProfile: { urgency: 'broke' }, sent: new Set([nodeId]) };
+  try { const r = await suggestV2(c); res.json({ ok: true, steps: r.steps, nodeId: r.nodeId, empty: r.empty, thought: r.thought }); }
+  catch (e) { res.json({ ok: false, error: e.message, stack: (e.stack || '').split('\n').slice(0, 4) }); }
+});
 app.post('/api/sim-run', async (req, res) => {
   if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'no brain key on server' });
   if (simRunBusy) return res.status(409).json({ error: 'a sim run is already in progress', status: simRunStatus });
