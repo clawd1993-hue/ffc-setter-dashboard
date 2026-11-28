@@ -351,9 +351,12 @@ function nextOptions(tree, nodeId) {
   (outg[nodeId] || []).forEach(e => walk(e.to, e.label ? [e.label] : [], 0));
   return opts;
 }
+function _sanitizeFill(v) {
+  return String(v || '').replace(/[\[\]]/g, '').replace(/^[^:]{1,25}:\s*/, '').replace(/\s{2,}/g, ' ').trim(); // strip stray brackets + a leaked "label:" prefix
+}
 function fillBrackets(text, brackets) {
   return (text || '').replace(/\[[^\]]+\]/g, m => {
-    if (brackets && brackets[m] != null && String(brackets[m]).trim()) return brackets[m];
+    if (brackets && brackets[m] != null && String(brackets[m]).trim()) return _sanitizeFill(brackets[m]);
     const inner = m.slice(1, -1);
     return inner.includes('/') ? inner.split('/')[0].trim() : inner.trim(); // graceful fallback, never leave literal [ ]
   });
@@ -474,7 +477,7 @@ const SAY_ONCE = [
     escalation: "Totally get wanting a number, exact pricing depends on your situation, which is exactly what the coach nails down on the call. Let's get you that real figure." },
 ];
 // kill em/en-dashes (classic AI tell) — replace with a comma. Leaves regular hyphens (payment-plan) alone.
-function _noAiDash(s) { return (s || '').replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',').replace(/^\s*,\s*/, '').replace(/\s{2,}/g, ' ').trim(); }
+function _noAiDash(s) { return (s || '').replace(/(\d)\s*[—–]\s*(\d)/g, '$1-$2').replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',').replace(/^\s*,\s*/, '').replace(/\s{2,}/g, ' ').trim(); }
 // final post-process on composed message steps: say-once dedup + de-AI-dash
 function applySayOnce(steps, c) {
   c.addressed = c.addressed || {};
@@ -504,7 +507,7 @@ MESSAGE: "${text}"
 Rules:
 - For a "[a / b / c]" slash-placeholder, pick the ONE option that best fits this lead.
 - For an open placeholder (e.g. [their goal]), use the lead's OWN words, but adapt them so the sentence is complete and correct — include any small connective words needed (e.g. make "want [their goal]" read "want to supplement the income", not "want supplement the income"). Match the grammar of the surrounding words.
-- Keep it short and in the lead's voice.
+- Keep it short and in the lead's voice. Output ONLY the words that replace the placeholder — NEVER include the placeholder's name, a label, a colon, or brackets.
 Lead profile: ${JSON.stringify(profile)}
 Lead just said: "${leadText}"
 Output ONLY JSON mapping each exact placeholder string to its filled value, e.g. {"${brs[0]}":"..."}.`;
