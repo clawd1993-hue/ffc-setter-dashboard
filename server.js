@@ -342,13 +342,13 @@ function _entryNode(tree) { const inc = new Set((tree.edges || []).map(e => e.to
 // expand from a node through route junctions → the reachable SEND targets (message/button nodes) + the branch conditions to reach each
 function nextOptions(tree, nodeId) {
   const { byId, outg } = _treeMaps(tree); const opts = []; const seenMsg = new Set(); const seenRoute = new Set();
-  (function walk(eid, labels, depth) {
+  function walk(eid, labels, depth) {
     if (depth > 8) return; const n = byId[eid]; if (!n) return;
     if ((n.kind || 'msg') === 'route') { if (seenRoute.has(eid)) return; seenRoute.add(eid); (outg[eid] || []).forEach(e => walk(e.to, e.label ? labels.concat(e.label) : labels, depth + 1)); }
     else { if (seenMsg.has(eid)) return; seenMsg.add(eid); opts.push({ id: eid, condition: labels.join(' / ') || '(continue)', text: _msgText(n), title: n.title || '' }); }
-  })(nodeId, [], 0);
-  // also allow stepping INTO the outgoing nodes directly (non-route) — handled above
-  (outg[nodeId] || []).forEach(e => { if ((byId[e.to] || {}).kind !== 'route' && !seenMsg.has(e.to)) { const n = byId[e.to]; seenMsg.add(e.to); opts.push({ id: e.to, condition: e.label || '(continue)', text: _msgText(n), title: n.title || '' }); } });
+  }
+  // start from the node's CHILDREN (expand through route junctions) — never return the node itself
+  (outg[nodeId] || []).forEach(e => walk(e.to, e.label ? [e.label] : [], 0));
   return opts;
 }
 function fillBrackets(text, brackets) {
