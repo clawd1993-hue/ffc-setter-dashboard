@@ -442,7 +442,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
   // pre-booking reassurance: if we're about to send the Booking Link and the lead still has an unresolved question, answer it FIRST
   let bookPrepend = '';
   if (firesBooking(target) && preBookQuestion) {
-    if (preBookPrice && !c.addressed.price) { bookPrepend = PRICE_DEFLECT_LINE; c.addressed.price = true; } // never deflected → perfect moment for the main price line
+    if (preBookPrice && !c.addressed.price) { bookPrepend = PRICE_DEFLECT_LINE; } // never deflected → perfect moment for the main price line (applySayOnce marks addressed AFTER, so it isn't stripped)
     else bookPrepend = BOOK_REASSURE;                                                                       // already deflected, or a non-price question → generic call-reframe
   }
   let firstMsg = true;
@@ -457,7 +457,6 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
           const m = txt.match(OPENER_RE);
           if (m) txt = m[0].trim().replace(/[,;:\s]+$/, '.') + ' ' + pr + ' ' + txt.slice(m[0].length);
           else txt = pr + ' ' + txt;                                                                     // no opener → deflection leads, then body
-          c.addressed.price = true;                                                                      // the main deflection has now fired
         }
         if (bookPrepend) txt = bookPrepend.replace(/[\s.]+$/, '') + '. ' + txt;                           // reassurance leads, then the booking line
         firstMsg = false;
@@ -478,6 +477,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
   }
   if (c.nodeId === 'gate') c.pastGate = true; // reached the Gate → from here the script handles money itself
   const finalSteps = applySayOnce(steps, c);
+  if (priceReply || bookPrepend === PRICE_DEFLECT_LINE) c.addressed.price = true; // price was handled this turn — lock it so we never re-deflect (applySayOnce already kept the first occurrence)
   return { steps: finalSteps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85, empty: !finalSteps.length,
     _dbg: { target: target && target.id, bookNode: !!(target && firesBooking(target)), preBookQuestion, preBookPrice, pastGate: !!c.pastGate, addressedPrice: !!(c.addressed && c.addressed.price), bookPrepend: bookPrepend ? bookPrepend.slice(0, 25) : '' } };
 }
