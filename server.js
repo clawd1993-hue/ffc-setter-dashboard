@@ -442,7 +442,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
   if (stay) {
     if (faq) { // known question + no forward move → answer it (msg 1), then re-pose the current question bridged (msg 2)
       steps.push({ type: 'message', text: faq.answer });
-      steps.push({ type: 'message', text: _bridgeOn(_msgText(byId[c.nodeId] || entry)) });
+      steps.push({ type: 'message', text: _bridgeOn(_shortReAsk(byId[c.nodeId] || entry)) });
     } else {
       steps.push({ type: 'message', text: (priceReply ? priceReply + ' ' : '') + (holding || 'One sec — let me sort that for you.') });
     }
@@ -521,6 +521,20 @@ const FAQS_SEED = [
 ];
 // "and "+script, lowercasing the first letter so msg 2 reads as a continuation ("Nice, so.." → "and nice, so..")
 const _bridgeOn = s => { const t = (s || '').replace(/^\s+/, ''); const i = t.search(/[A-Za-z]/); return 'and ' + (i >= 0 ? t.slice(0, i) + t[i].toLowerCase() + t.slice(i + 1) : t); };
+// SHORT re-ask: after answering an FAQ with no forward move, re-pose just the node's QUESTION, not its whole body. Grab the last clause before the final "?" (cut at the last sentence-ender/emoji boundary), strip a leading and/so so the bridge doesn't double up.
+function _shortReAsk(node) {
+  let t = _msgText(node).replace(/\s*\|\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  const qi = t.lastIndexOf('?');
+  let clause;
+  if (qi === -1) { const s = (t.match(/[^.?!]*[.?!]/g) || [t]).map(x => x.trim()).filter(Boolean); clause = s.pop() || t; }
+  else {
+    const q = t.slice(0, qi + 1);
+    let cut = 0; const re = /[.!?]\s+|[\u{1F300}-\u{1FAFF}☀-➿⬀-⯿]\s*/gu; let m;
+    while ((m = re.exec(q)) !== null) { if (re.lastIndex < q.length) cut = re.lastIndex; }
+    clause = q.slice(cut).trim();
+  }
+  return clause.replace(/^(and so|and|so|but|ok|okay)\b[,\s]*/i, '').trim();
+}
 // kill em/en-dashes (classic AI tell) — replace with a comma. Leaves regular hyphens (payment-plan) alone.
 function _noAiDash(s) { return (s || '').replace(/(\d)\s*[—–]\s*(\d)/g, '$1-$2').replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',').replace(/^\s*,\s*/, '').replace(/\s{2,}/g, ' ').trim(); }
 // final post-process on composed message steps: say-once dedup + de-AI-dash
