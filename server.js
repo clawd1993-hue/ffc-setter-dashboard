@@ -373,7 +373,8 @@ async function suggestV2(c) {
   c.addressed = c.addressed || {};   // topics already handled (price…) — don't re-explain, just acknowledge + advance
   c.pastGate = c.pastGate || false;  // once the Gate is reached, the script itself handles money → no standalone price deflection
   const firstMove = !c.messages.some(m => m.dir === 'out');
-  let target = null, openerSwap = '', priceReply = '', brackets = {}, thought = '', stay = false, holding = '', preBookQuestion = false, preBookPrice = false;
+  let target = null, openerSwap = '', priceReply = '', brackets = {}, thought = '', stay = false, holding = '', preBookQuestion = false, preBookPrice = false, faq = null;
+  const FAQS = [...FAQS_SEED, ...((tree.faqs || []).filter(f => f && f.id && f.answer))]; // tree.faqs (whiteboard panel) override/extend the seed
   if (firstMove) {
     target = entry;
   } else {
@@ -401,7 +402,10 @@ The scripted line is sent VERBATIM — it already has its own opener. Do NOT wri
 - "openerSwap": usually EMPTY. Fill it with 1-3 words ONLY if the scripted line's opener would be tone-deaf — i.e. the lead just shared something HEAVY/negative (loss, bad news, real distress) AND the script opens upbeat ("Nice", "Love that", "Perfect"). Then give a short fitting replacement for just that opener, e.g. "Damn, sorry to hear that". It REPLACES the script's first word only; it never adds on top.
 - "priceReply": EMPTY unless the lead asked about PRICE — then a short deflection to prepend (still pick the forward option).${Object.keys(c.addressed).length ? ` Already addressed: ${Object.keys(c.addressed).join(', ')} — do NOT repeat those; if the lead is BLOCKING (refuses to move until they get a number, e.g. "just tell me the number"), set priceReply to EXACTLY: "${(SAY_ONCE.find(s => c.addressed[s.topic]) || {}).escalation || ''}"` : ''}
 If you are about to send the BOOKING LINK, also flag whether the lead still has an unresolved question: "preBookQuestion" = true if their last message raised a QUESTION or a CONDITION the booking line doesn't answer (NOT a plain yes or just excitement); "preBookPrice" = true if that question is specifically about price/cost/payment.
-Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceReply":"","preBookQuestion":false,"preBookPrice":false,"facts":{"<key>":"<value learned this turn>"},"holdingReply":"<only if stay>"}`;
+- "faqId": the lead may throw a RANDOM QUESTION that none of the options answer (e.g. "is this legit?", "do I need followers?"). If their last message clearly matches ONE of these FAQs, set "faqId" to its id so we answer it before continuing. Otherwise "faqId": null. PRICE/cost/payment questions are NOT FAQs (handled separately) — never set faqId for those. Still pick the best "choice" too (they may have both answered AND asked).
+FAQs:
+${FAQS.map(f => `- ${f.id}: ${f.trigger}`).join('\n')}
+Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceReply":"","preBookQuestion":false,"preBookPrice":false,"faqId":null,"facts":{"<key>":"<value learned this turn>"},"holdingReply":"<only if stay>"}`;
     let parsed = null;
     for (let a = 0; a < 2 && !parsed; a++) {
       const r = await client.messages.create({ model: 'claude-sonnet-5', max_tokens: 250, system: sysA, messages: [{ role: 'user', content: 'Decide. JSON only.' }] }).catch(() => null);
@@ -412,6 +416,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
     if (!parsed) parsed = { choice: _heuristicChoice(lastIn ? lastIn.text : '', opts), facts: {} };
     openerSwap = (parsed.openerSwap || '').trim(); priceReply = (parsed.priceReply || '').trim();
     preBookQuestion = parsed.preBookQuestion === true; preBookPrice = parsed.preBookPrice === true;
+    if (parsed.faqId) { faq = FAQS.find(f => f.id === parsed.faqId) || null; if (faq && /price|cost|payment/i.test(faq.id)) faq = null; } // price is never an FAQ — defer to the price machinery
     if (c.pastGate) priceReply = ''; // from the Gate onward, money talk is on-script — the branches handle it, no deflection
     if (parsed.facts && typeof parsed.facts === 'object') Object.assign(c.leadProfile, parsed.facts);
     if (parsed.choice === 'stay' || parsed.choice === -1) { stay = true; holding = (parsed.holdingReply || '').trim(); }
@@ -435,9 +440,15 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
   // compose (text always comes from the node → can't be blank)
   const steps = [];
   if (stay) {
-    steps.push({ type: 'message', text: (priceReply ? priceReply + ' ' : '') + (holding || 'One sec — let me sort that for you.') });
+    if (faq) { // known question + no forward move → answer it (msg 1), then re-pose the current question bridged (msg 2)
+      steps.push({ type: 'message', text: faq.answer });
+      steps.push({ type: 'message', text: _bridgeOn(_msgText(byId[c.nodeId] || entry)) });
+    } else {
+      steps.push({ type: 'message', text: (priceReply ? priceReply + ' ' : '') + (holding || 'One sec — let me sort that for you.') });
+    }
     return { steps: applySayOnce(steps, c), nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85 };
   }
+  if (faq) steps.push({ type: 'message', text: faq.answer }); // advance path: answer the FAQ first (msg 1), the bridged script move follows below
   const tsteps = target.steps || (target.text ? [{ t: 'msg', text: target.text }] : []);
   // pre-booking reassurance: if we're about to send the Booking Link and the lead still has an unresolved question, answer it FIRST
   let bookPrepend = '';
@@ -459,6 +470,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
           else txt = pr + ' ' + txt;                                                                     // no opener → deflection leads, then body
         }
         if (bookPrepend) txt = bookPrepend.replace(/[\s.]+$/, '') + '. ' + txt;                           // reassurance leads, then the booking line
+        if (faq) txt = _bridgeOn(txt);                                                                    // FAQ answered above → bridge the script move: "Nice, so.." → "and nice, so.."
         firstMsg = false;
       }
       steps.push({ type: 'message', text: txt });
@@ -479,7 +491,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
   const finalSteps = applySayOnce(steps, c);
   if (priceReply || bookPrepend === BOOK_PRICE_COMBO) c.addressed.price = true; // price was handled this turn — lock it so we never re-deflect (applySayOnce already kept the first occurrence)
   return { steps: finalSteps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85, empty: !finalSteps.length,
-    _dbg: { target: target && target.id, bookNode: !!(target && firesBooking(target)), preBookQuestion, preBookPrice, pastGate: !!c.pastGate, addressedPrice: !!(c.addressed && c.addressed.price), bookPrepend: bookPrepend ? bookPrepend.slice(0, 25) : '' } };
+    _dbg: { target: target && target.id, faq: faq ? faq.id : null, bookNode: !!(target && firesBooking(target)), preBookQuestion, preBookPrice, pastGate: !!c.pastGate, addressedPrice: !!(c.addressed && c.addressed.price), bookPrepend: bookPrepend ? bookPrepend.slice(0, 25) : '' } };
 }
 // a "continue" arrow = fire straight into the next message without waiting for a reply (marked cont=true or label >> / ⚡)
 function _isCont(e) { return !!(e && (e.cont || /(^|\s)(>>|⚡|continue)\b/i.test(e.label || ''))); }
@@ -499,6 +511,16 @@ const BOOK_REASSURE = "For sure, the goal of the call is to see if there's a fit
 // price question RIGHT at the booking link, never deflected before → stack the main price deflect + the call-reframe into one line, one "For sure", then the link
 const BOOK_PRICE_COMBO = "For sure, " + PRICE_DEFLECT_LINE.charAt(0).toLowerCase() + PRICE_DEFLECT_LINE.slice(1) + " " + BOOK_REASSURE.replace(/^For sure,\s*the\b/i, 'The');
 const firesBooking = n => (n.steps || []).some(s => s.t === 'flow' && /booking link/i.test(s.name || ''));
+// FAQ layer: a lead throws a random question mid-flow → answer it (msg 1, canned/verbatim) then bridge back to the normal move (msg 2, "and "+script). PRICE is NOT here (own machinery). SEED set — Michael supplies the real list; also merges tree.faqs when the whiteboard panel exists.
+const FAQS_SEED = [
+  { id: 'legit',      trigger: 'is this legit / real / a scam / too good to be true / does it actually work', answer: "Haha totally fair to ask. Yeah it's a real established program with thousands of students, it's legit, you've just gotta actually put the work in." },
+  { id: 'following',  trigger: 'do i need a big following / audience / followers / to show my face',           answer: "Nope, not at all. The whole thing is faceless, you don't need any followers or to show your face." },
+  { id: 'experience', trigger: 'do i need experience / tech skills / to be techy / have done this before',      answer: "Not at all, most people start with zero experience, it's built for total beginners and we walk you through every step." },
+  { id: 'time',       trigger: 'how much time does it take / i am busy / do i have enough time',                 answer: "You can do it around a job, most people start with an hour or so a day, it's about being consistent not grinding all day." },
+  { id: 'country',    trigger: 'does it work in my country / outside the US / where i live',                    answer: "Yeah it works anywhere, our students are all over the world, none of it is location-locked." },
+];
+// "and "+script, lowercasing the first letter so msg 2 reads as a continuation ("Nice, so.." → "and nice, so..")
+const _bridgeOn = s => { const t = (s || '').replace(/^\s+/, ''); const i = t.search(/[A-Za-z]/); return 'and ' + (i >= 0 ? t.slice(0, i) + t[i].toLowerCase() + t.slice(i + 1) : t); };
 // kill em/en-dashes (classic AI tell) — replace with a comma. Leaves regular hyphens (payment-plan) alone.
 function _noAiDash(s) { return (s || '').replace(/(\d)\s*[—–]\s*(\d)/g, '$1-$2').replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',').replace(/^\s*,\s*/, '').replace(/\s{2,}/g, ' ').trim(); }
 // final post-process on composed message steps: say-once dedup + de-AI-dash
