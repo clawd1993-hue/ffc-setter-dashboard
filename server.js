@@ -418,6 +418,16 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
     preBookQuestion = parsed.preBookQuestion === true; preBookPrice = parsed.preBookPrice === true;
     if (parsed.faqId) { faq = FAQS.find(f => f.id === parsed.faqId) || null; if (faq && /price|cost|payment/i.test(faq.id)) faq = null; } // price is never an FAQ — defer to the price machinery
     if (c.pastGate) priceReply = ''; // from the Gate onward, money talk is on-script — the branches handle it, no deflection
+    // PRICE-BLOCKER LADDER: a hard blocker who keeps demanding a number must NEVER get the escalation line twice.
+    // deflect (main packages line) → escalate once → firm pivot to the call once → short hold. Each rung fires at most once.
+    if (priceReply) {
+      const nrm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (nrm(priceReply).includes(nrm(SAY_ONCE[0].escalation).slice(0, 28))) { // model reached for the escalation line
+        if (!c.priceEscalated) c.priceEscalated = true;                         // 1st escalation → allow it
+        else if (!c.priceFinalPushed) { priceReply = PRICE_FINAL_PUSH; c.priceFinalPushed = true; } // 2nd → firm pivot, don't repeat
+        else priceReply = PRICE_HOLD_SHORT;                                     // 3rd+ → short hold firm
+      }
+    }
     if (parsed.facts && typeof parsed.facts === 'object') Object.assign(c.leadProfile, parsed.facts);
     if (parsed.choice === 'stay' || parsed.choice === -1) { stay = true; holding = (parsed.holdingReply || '').trim(); }
     else { let idx = parseInt(parsed.choice, 10); if (isNaN(idx) || !opts[idx]) idx = _heuristicChoice(lastIn ? lastIn.text : '', opts); target = byId[opts[idx].id]; }
@@ -508,6 +518,9 @@ const SAY_ONCE = [
 ];
 const PRICE_DEFLECT_LINE = SAY_ONCE[0].line;
 const BOOK_REASSURE = "For sure, the goal of the call is to see if there's a fit and our head coach can walk you through how everything works.";
+// price-blocker ladder lines (rung 3 and 4) — a lead who keeps shoving for a number after the escalation
+const PRICE_FINAL_PUSH = "I hear you, and honestly the real number comes down to what setup fits you best, which is exactly what the coach locks in on the call. Want me to grab you a time so you get it straight from them?";
+const PRICE_HOLD_SHORT = "Like I said, that's exactly what the call is for 🙏 want me to grab you a slot?";
 // price question RIGHT at the booking link, never deflected before → stack the main price deflect + the call-reframe into one line, one "For sure", then the link
 const BOOK_PRICE_COMBO = "For sure, " + PRICE_DEFLECT_LINE.charAt(0).toLowerCase() + PRICE_DEFLECT_LINE.slice(1) + " " + BOOK_REASSURE.replace(/^For sure,\s*the\b/i, 'The');
 const firesBooking = n => (n.steps || []).some(s => s.t === 'flow' && /booking link/i.test(s.name || ''));
@@ -983,7 +996,7 @@ app.get('/api/sim-run', (_req, res) => { res.set('Cache-Control', 'no-store'); r
 app.get('/api/sim-debug', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const nodeId = req.query.node || 'b_w';
-  const c = { messages: [{ dir: 'out', text: 'prev', t: 1 }, { dir: 'in', text: req.query.say || 'honestly im just broke, bills piling up and need money fast', t: 2 }], nodeId, mode: 'approve', leadProfile: { urgency: 'broke' }, sent: new Set([nodeId]), pastGate: req.query.pg === '1', addressed: req.query.priced === '1' ? { price: true } : {} };
+  const c = { messages: [{ dir: 'out', text: 'prev', t: 1 }, { dir: 'in', text: req.query.say || 'honestly im just broke, bills piling up and need money fast', t: 2 }], nodeId, mode: 'approve', leadProfile: { urgency: 'broke' }, sent: new Set([nodeId]), pastGate: req.query.pg === '1', addressed: req.query.priced === '1' ? { price: true } : {}, priceEscalated: req.query.esc === '1', priceFinalPushed: req.query.finalpush === '1' };
   try {
     const tree = await getSpecial(SIM_TREE_ID, simTreeMem);
     const diag = { treeLoaded: !!(tree && tree.nodes), nodeCount: tree && tree.nodes ? tree.nodes.length : 0, hasNode: !!(tree && tree.nodes && tree.nodes.find(n => n.id === nodeId)), opts: tree && tree.nodes ? nextOptions(tree, nodeId).map(o => o.id) : [] };
