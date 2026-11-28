@@ -442,7 +442,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
   // pre-booking reassurance: if we're about to send the Booking Link and the lead still has an unresolved question, answer it FIRST
   let bookPrepend = '';
   if (firesBooking(target) && preBookQuestion) {
-    if (preBookPrice && !c.addressed.price) { bookPrepend = PRICE_DEFLECT_LINE; } // never deflected → perfect moment for the main price line (applySayOnce marks addressed AFTER, so it isn't stripped)
+    if (preBookPrice && !c.addressed.price) { bookPrepend = BOOK_PRICE_COMBO; } // price asked at the link, never deflected → combo: main price line + call-reframe (applySayOnce marks addressed AFTER, so it isn't stripped)
     else bookPrepend = BOOK_REASSURE;                                                                       // already deflected, or a non-price question → generic call-reframe
   }
   let firstMsg = true;
@@ -477,7 +477,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
   }
   if (c.nodeId === 'gate') c.pastGate = true; // reached the Gate → from here the script handles money itself
   const finalSteps = applySayOnce(steps, c);
-  if (priceReply || bookPrepend === PRICE_DEFLECT_LINE) c.addressed.price = true; // price was handled this turn — lock it so we never re-deflect (applySayOnce already kept the first occurrence)
+  if (priceReply || bookPrepend === BOOK_PRICE_COMBO) c.addressed.price = true; // price was handled this turn — lock it so we never re-deflect (applySayOnce already kept the first occurrence)
   return { steps: finalSteps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85, empty: !finalSteps.length,
     _dbg: { target: target && target.id, bookNode: !!(target && firesBooking(target)), preBookQuestion, preBookPrice, pastGate: !!c.pastGate, addressedPrice: !!(c.addressed && c.addressed.price), bookPrepend: bookPrepend ? bookPrepend.slice(0, 25) : '' } };
 }
@@ -496,6 +496,8 @@ const SAY_ONCE = [
 ];
 const PRICE_DEFLECT_LINE = SAY_ONCE[0].line;
 const BOOK_REASSURE = "For sure, the goal of the call is to see if there's a fit and our head coach can walk you through how everything works.";
+// price question RIGHT at the booking link, never deflected before → stack the main price deflect + the call-reframe into one line, one "For sure", then the link
+const BOOK_PRICE_COMBO = "For sure, " + PRICE_DEFLECT_LINE.charAt(0).toLowerCase() + PRICE_DEFLECT_LINE.slice(1) + " " + BOOK_REASSURE.replace(/^For sure,\s*the\b/i, 'The');
 const firesBooking = n => (n.steps || []).some(s => s.t === 'flow' && /booking link/i.test(s.name || ''));
 // kill em/en-dashes (classic AI tell) — replace with a comma. Leaves regular hyphens (payment-plan) alone.
 function _noAiDash(s) { return (s || '').replace(/(\d)\s*[—–]\s*(\d)/g, '$1-$2').replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',').replace(/^\s*,\s*/, '').replace(/\s{2,}/g, ' ').trim(); }
