@@ -478,7 +478,8 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
   }
   if (c.nodeId === 'gate') c.pastGate = true; // reached the Gate → from here the script handles money itself
   const finalSteps = applySayOnce(steps, c);
-  return { steps: finalSteps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85, empty: !finalSteps.length };
+  return { steps: finalSteps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85, empty: !finalSteps.length,
+    _dbg: { target: target && target.id, bookNode: !!(target && firesBooking(target)), preBookQuestion, preBookPrice, pastGate: !!c.pastGate, addressedPrice: !!(c.addressed && c.addressed.price), bookPrepend: bookPrepend ? bookPrepend.slice(0, 25) : '' } };
 }
 // a "continue" arrow = fire straight into the next message without waiting for a reply (marked cont=true or label >> / ⚡)
 function _isCont(e) { return !!(e && (e.cont || /(^|\s)(>>|⚡|continue)\b/i.test(e.label || ''))); }
@@ -940,7 +941,7 @@ app.get('/api/sim-debug', async (req, res) => {
     const tree = await getSpecial(SIM_TREE_ID, simTreeMem);
     const diag = { treeLoaded: !!(tree && tree.nodes), nodeCount: tree && tree.nodes ? tree.nodes.length : 0, hasNode: !!(tree && tree.nodes && tree.nodes.find(n => n.id === nodeId)), opts: tree && tree.nodes ? nextOptions(tree, nodeId).map(o => o.id) : [] };
     const r = await suggestV2(c);
-    res.json({ ok: true, diag, steps: r.steps, nodeId: r.nodeId, empty: r.empty, thought: r.thought });
+    res.json({ ok: true, diag, dbg: r._dbg, steps: r.steps, nodeId: r.nodeId, empty: r.empty, thought: r.thought });
   } catch (e) { res.json({ ok: false, error: e.message, stack: (e.stack || '').split('\n').slice(0, 5) }); }
 });
 app.post('/api/sim-run', async (req, res) => {
