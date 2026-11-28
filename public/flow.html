@@ -688,7 +688,7 @@ function saveNow(){ flushSave(); } // manual flush, immediate
 function exportTree(){
   const tree={
     nodes:nodes.map(n=>({id:n.id,kind:n.kind||'bubble',title:n.title||'',steps:n.steps||(n.text?[{t:'msg',text:n.text}]:[])})),
-    edges:edges.map(e=>({from:e.from,to:e.to,label:e.label||''})),
+    edges:edges.map(e=>({from:e.from,to:e.to,label:e.label||'',cont:/(^|\s)(>>|⚡|continue)\b/i.test(e.label||'')})),
     rules:hardRules.slice(),
     exportedAt:Date.now()
   };

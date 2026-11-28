@@ -362,7 +362,7 @@ async function suggestV2(c) {
   if (!ANTHROPIC_API_KEY) return { steps: [], empty: true };
   const tree = await getSpecial(SIM_TREE_ID, simTreeMem);
   if (!tree || !tree.nodes || !tree.nodes.length) return { steps: [], empty: true };
-  const { byId } = _treeMaps(tree);
+  const { byId, outg } = _treeMaps(tree);
   const entry = _entryNode(tree);
   c.leadProfile = c.leadProfile || {};
   c.sent = c.sent || new Set();      // node ids already sent — never repeat a block
@@ -428,8 +428,20 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"opener":"<tiny acknowled
     else { let txt = fillBrackets(s.text, brackets); if (!openerUsed && opener) { txt = opener + ' ' + txt; openerUsed = true; } steps.push({ type: 'message', text: txt }); }
   }
   c.nodeId = target.id; c.sent.add(target.id);
-  return { steps, nodeId: target.id, thought, profile: c.leadProfile, confidence: 0.85, empty: !steps.length };
+  // CHAIN continue-arrows (no-wait): fire straight into the next message(s) in the SAME turn, no pause for a reply
+  let chainFrom = target, hops = 0;
+  while (hops++ < 5) {
+    const ce = (outg[chainFrom.id] || []).find(e => _isCont(e));
+    if (!ce) break;
+    const nxt = byId[ce.to]; if (!nxt || c.sent.has(nxt.id)) break;
+    const ns = nxt.steps || (nxt.text ? [{ t: 'msg', text: nxt.text }] : []);
+    for (const s of ns) { if (s.t === 'flow') steps.push({ type: 'flow', name: s.name, flow_ns: flowNsByName(s.name) }); else steps.push({ type: 'message', text: fillBrackets(s.text, {}) }); }
+    c.nodeId = nxt.id; c.sent.add(nxt.id); chainFrom = nxt;
+  }
+  return { steps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85, empty: !steps.length };
 }
+// a "continue" arrow = fire straight into the next message without waiting for a reply (marked cont=true or label >> / ⚡)
+function _isCont(e) { return !!(e && (e.cont || /(^|\s)(>>|⚡|continue)\b/i.test(e.label || ''))); }
 // keyword-match the lead's reply to the best branch — the "never die" fallback when the model fumbles
 function _heuristicChoice(leadText, opts) {
   const tw = new Set(_toks(leadText)); let best = 0, bs = -1;
