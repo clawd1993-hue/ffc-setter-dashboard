@@ -373,7 +373,7 @@ async function suggestV2(c) {
   c.addressed = c.addressed || {};   // topics already handled (price…) — don't re-explain, just acknowledge + advance
   c.pastGate = c.pastGate || false;  // once the Gate is reached, the script itself handles money → no standalone price deflection
   const firstMove = !c.messages.some(m => m.dir === 'out');
-  let target = null, openerSwap = '', priceReply = '', brackets = {}, thought = '', stay = false, holding = '';
+  let target = null, openerSwap = '', priceReply = '', brackets = {}, thought = '', stay = false, holding = '', preBookQuestion = false, preBookPrice = false;
   if (firstMove) {
     target = entry;
   } else {
@@ -400,7 +400,8 @@ RULES: ALWAYS advance — pick a numbered option. Use "stay" ONLY for a rare una
 The scripted line is sent VERBATIM — it already has its own opener. Do NOT write your own acknowledgment on top of it.
 - "openerSwap": usually EMPTY. Fill it with 1-3 words ONLY if the scripted line's opener would be tone-deaf — i.e. the lead just shared something HEAVY/negative (loss, bad news, real distress) AND the script opens upbeat ("Nice", "Love that", "Perfect"). Then give a short fitting replacement for just that opener, e.g. "Damn, sorry to hear that". It REPLACES the script's first word only; it never adds on top.
 - "priceReply": EMPTY unless the lead asked about PRICE — then a short deflection to prepend (still pick the forward option).${Object.keys(c.addressed).length ? ` Already addressed: ${Object.keys(c.addressed).join(', ')} — do NOT repeat those; if the lead is BLOCKING (refuses to move until they get a number, e.g. "just tell me the number"), set priceReply to EXACTLY: "${(SAY_ONCE.find(s => c.addressed[s.topic]) || {}).escalation || ''}"` : ''}
-Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceReply":"","facts":{"<key>":"<value learned this turn>"},"holdingReply":"<only if stay>"}`;
+If you are about to send the BOOKING LINK, also flag whether the lead still has an unresolved question: "preBookQuestion" = true if their last message raised a QUESTION or a CONDITION the booking line doesn't answer (NOT a plain yes or just excitement); "preBookPrice" = true if that question is specifically about price/cost/payment.
+Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceReply":"","preBookQuestion":false,"preBookPrice":false,"facts":{"<key>":"<value learned this turn>"},"holdingReply":"<only if stay>"}`;
     let parsed = null;
     for (let a = 0; a < 2 && !parsed; a++) {
       const r = await client.messages.create({ model: 'claude-sonnet-5', max_tokens: 250, system: sysA, messages: [{ role: 'user', content: 'Decide. JSON only.' }] }).catch(() => null);
@@ -410,6 +411,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
     // INVARIANT: a non-terminal node NEVER dies. If the model failed, keyword-advance instead of ending.
     if (!parsed) parsed = { choice: _heuristicChoice(lastIn ? lastIn.text : '', opts), facts: {} };
     openerSwap = (parsed.openerSwap || '').trim(); priceReply = (parsed.priceReply || '').trim();
+    preBookQuestion = parsed.preBookQuestion === true; preBookPrice = parsed.preBookPrice === true;
     if (c.pastGate) priceReply = ''; // from the Gate onward, money talk is on-script — the branches handle it, no deflection
     if (parsed.facts && typeof parsed.facts === 'object') Object.assign(c.leadProfile, parsed.facts);
     if (parsed.choice === 'stay' || parsed.choice === -1) { stay = true; holding = (parsed.holdingReply || '').trim(); }
@@ -431,6 +433,12 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
     return { steps: applySayOnce(steps, c), nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85 };
   }
   const tsteps = target.steps || (target.text ? [{ t: 'msg', text: target.text }] : []);
+  // pre-booking reassurance: if we're about to send the Booking Link and the lead still has an unresolved question, answer it FIRST
+  let bookPrepend = '';
+  if (firesBooking(target) && preBookQuestion) {
+    if (preBookPrice && !c.addressed.price) { bookPrepend = PRICE_DEFLECT_LINE; c.addressed.price = true; } // never deflected → perfect moment for the main price line
+    else bookPrepend = BOOK_REASSURE;                                                                       // already deflected, or a non-price question → generic call-reframe
+  }
   let firstMsg = true;
   for (const s of tsteps) {
     if (s.t === 'flow') steps.push({ type: 'flow', name: s.name, flow_ns: flowNsByName(s.name) });
@@ -443,7 +451,9 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
           const m = txt.match(OPENER_RE);
           if (m) txt = m[0].trim().replace(/[,;:\s]+$/, '.') + ' ' + pr + ' ' + txt.slice(m[0].length);
           else txt = pr + ' ' + txt;                                                                     // no opener → deflection leads, then body
+          c.addressed.price = true;                                                                      // the main deflection has now fired
         }
+        if (bookPrepend) txt = bookPrepend.replace(/[\s.]+$/, '') + '. ' + txt;                           // reassurance leads, then the booking line
         firstMsg = false;
       }
       steps.push({ type: 'message', text: txt });
@@ -474,8 +484,12 @@ const OPENER_RE = /^((?:got it|gotcha|nice|love that|ah|i hear you|fair enough|f
 const SAY_ONCE = [
   { topic: 'price', sig: /different types of packages/i,
     strip: /we have different types of packages[^.?!]*?best fit for you[,.]?\s*/i,
+    line: "We have different types of packages so it really comes down to what would be the absolute best fit for you.",
     escalation: "Totally get wanting a number, exact pricing depends on your situation, which is exactly what the coach nails down on the call. Let's get you that real figure." },
 ];
+const PRICE_DEFLECT_LINE = SAY_ONCE[0].line;
+const BOOK_REASSURE = "For sure, the goal of the call is to see if there's a fit and our head coach can walk you through how everything works.";
+const firesBooking = n => (n.steps || []).some(s => s.t === 'flow' && /booking link/i.test(s.name || ''));
 // kill em/en-dashes (classic AI tell) — replace with a comma. Leaves regular hyphens (payment-plan) alone.
 function _noAiDash(s) { return (s || '').replace(/(\d)\s*[—–]\s*(\d)/g, '$1-$2').replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',').replace(/^\s*,\s*/, '').replace(/\s{2,}/g, ' ').trim(); }
 // final post-process on composed message steps: say-once dedup + de-AI-dash
