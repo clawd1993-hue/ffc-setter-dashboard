@@ -279,9 +279,7 @@ async function suggest(c) {
     await refreshFlowMap();
     const transcript = transcriptOf(c);
     const scriptText = (await getScriptText()) || NO_SCRIPT;
-    const msg = await client.messages.create({
-      model: 'claude-sonnet-5', max_tokens: 500,
-      system: `You are Paul, an FFC (Faceless Funnel Challenge) DM setter. Warm, human, concise, never pushy. Goal: follow the script below to qualify the lead and book a call for the $5k Elite.
+    const SYS = `You are Paul, an FFC (Faceless Funnel Challenge) DM setter. Warm, human, concise, never pushy. Goal: follow the script below to qualify the lead and book a call for the $5k Elite.
 Read the transcript, work out WHERE in the script the lead is, and produce the next scripted move — adapted to their exact words, not copy-paste. Acknowledge what they actually said in one line before the next question. Never skip the Gate before sending any link. Use the script's wording and ONLY the emojis the script itself uses — do NOT add emojis (no 👇 etc.) that aren't in the script.
 
 A single move can be MULTIPLE steps in order — e.g. fire the "Welcome VN" automation THEN send the Step 1 message. Available automations you may fire (use the exact name): ${SENDABLE_FLOWS.join(', ')}.
@@ -291,12 +289,22 @@ OUTPUT FORMAT — reply with ONLY a JSON array of steps, in order, no prose arou
 Use {"fire":"<automation name>"} to fire an automation, {"say":"<message>"} to send a text. Most turns are just one {"say":...}. Fire an automation only where the script calls for it (Welcome VN at the very start, What is FFC after Step 1, FFC Access Link if they can't find it, Proof + Booking Link in the green/yellow branches). Output valid JSON only.
 
 SCRIPT:
-${scriptText}`,
+${scriptText}`;
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-5', max_tokens: 500, system: SYS,
       messages: [{ role: 'user', content: `Conversation so far:\n${transcript}\n\nGive the next move as a JSON array of steps, following the script for where this lead is.` }],
     });
     const out = (msg.content.find(b => b.type === 'text') || {}).text || '';
-    const steps = parseSteps(out);
-    return { steps, text: steps.filter(s => s.type === 'message').map(s => s.text).join('\n'), confidence: 0.8 };
+    const clean = ss => ss.filter(s => s.type === 'flow' || (s.text && s.text.trim()));
+    let steps = clean(parseSteps(out));
+    if (!steps.length) { // empty/blank output → ONE retry, then give up gracefully (never send a blank)
+      const retry = await client.messages.create({
+        model: 'claude-sonnet-5', max_tokens: 500, system: SYS,
+        messages: [{ role: 'user', content: `Conversation so far:\n${transcript}\n\nGive the next move as a JSON array of steps. Output ONLY the JSON array, nothing else.` }],
+      }).catch(() => null);
+      if (retry) steps = clean(parseSteps((retry.content.find(b => b.type === 'text') || {}).text || ''));
+    }
+    return { steps, text: steps.filter(s => s.type === 'message').map(s => s.text).join('\n'), confidence: steps.length ? 0.8 : 0, empty: !steps.length };
   } catch (e) {
     return { text: `(brain error: ${e.message})`, confidence: 0, stub: true };
   }
