@@ -649,6 +649,94 @@ const SIM_TREE_ID = '__sim_tree__';
 let simTreeMem = null;
 app.get('/api/sim-tree', async (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ tree: await getSpecial(SIM_TREE_ID, simTreeMem) || null }); });
 app.post('/api/sim-tree', async (req, res) => { const tree = req.body && req.body.tree; if (!tree || typeof tree !== 'object') return res.status(400).json({ error: 'no tree' }); simTreeMem = tree; res.json(await putSpecial(SIM_TREE_ID, '(sim tree)', tree)); });
+
+// ===== SIM ENGINE — lead-bot ↔ the REAL suggest() brain. Fully offline: never sends to ManyChat =====
+const SIM_LIB = (() => { try { return require('./sim/avatars'); } catch (e) { return { AVATARS: [], ANSWER_STYLES: [], CURVEBALLS: [] }; } })();
+let simRunBusy = false, simRunStatus = { running: false, done: 0, total: 0, startedAt: 0 };
+
+async function leadReply(avatar, style, curveball, transcript, firstTurn) {
+  const Anthropic = require('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+  const sys = `You are a REAL person texting an Instagram DM setter from FFC. You are NOT an AI and never say you are.
+What you know: you bought the $6.95 Faceless Funnel Challenge (learn to make money online selling digital products by posting FACELESS reels on Instagram). You watched the Elite webinar so you know a DONE-FOR-YOU program exists — but you do NOT know its price or backend. You text casually: lowercase, short, the odd typo, emojis sometimes.
+YOUR CHARACTER (${avatar.label}): ${avatar.mindset}. Money: ${avatar.money}. You naturally lean toward: ${avatar.leans}. ${avatar.note}
+HOW YOU TEXT (${style.id}): ${style.note}${curveball ? `\nAt a natural moment in the chat you will: ${curveball}.` : ''}
+Reply with ONLY your next message as this person — no narration, no quotes, no labels. React naturally to what the setter just said.`;
+  const r = await client.messages.create({
+    model: 'claude-sonnet-5', max_tokens: 160, system: sys,
+    messages: [{ role: 'user', content: `Conversation so far (you are "Lead"):\n${transcript || '(the setter is about to message you)'}\n\nWrite your next reply as the lead.${firstTurn ? ' This is the very start.' : ''}` }],
+  });
+  return ((r.content.find(b => b.type === 'text') || {}).text || '...').trim();
+}
+
+// best-effort: map a setter message to the nearest tree node (for the review tags)
+let _simNodes = { nodes: [], at: 0 };
+async function simTreeNodes() { if (Date.now() - _simNodes.at < 60000) return _simNodes.nodes; const t = await getSpecial(SIM_TREE_ID, simTreeMem); _simNodes = { nodes: (t && t.nodes) || [], at: Date.now() }; return _simNodes.nodes; }
+function _toks(s) { return (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 3); }
+function nearestNode(text, nodes) {
+  const tw = new Set(_toks(text)); if (!tw.size) return null; let best = null, bs = 0;
+  for (const n of nodes) {
+    const body = (n.steps || []).map(s => s.text || '').join(' ') + ' ' + (n.title || '');
+    const ns = new Set(_toks(body)); if (!ns.size) continue;
+    let ov = 0; for (const w of tw) if (ns.has(w)) ov++;
+    const score = ov / Math.max(5, tw.size); if (score > bs) { bs = score; best = n.id; }
+  }
+  return bs > 0.22 ? best : null;
+}
+
+async function runOneSim(idx, avatar, style, curveball) {
+  const nodes = await simTreeNodes();
+  const c = { messages: [], mode: 'approve' }; // ad-hoc convo — never stored, never sent
+  const turns = []; let booked = false; const MAX = 14;
+  for (let t = 0; t < MAX; t++) {
+    let steps = [];
+    try { const s = await suggest(c); steps = s.steps || []; } catch (e) {}
+    if (!steps.length) break;
+    for (const st of steps) {
+      if (st.type === 'flow') {
+        const vn = VN_TRANSCRIPTS[st.name];
+        const text = vn ? `🎙️ Voice note (${st.name}): ${vn}` : `⚡ [sent: ${st.name}]`;
+        c.messages.push({ dir: 'out', text, t: Date.now() });
+        turns.push({ role: 'setter', text, nodeId: st.name, expectedNodeId: st.name });
+        if (st.name === 'Booking Link') booked = true;
+      } else {
+        c.messages.push({ dir: 'out', text: st.text, t: Date.now() });
+        turns.push({ role: 'setter', text: st.text, nodeId: nearestNode(st.text, nodes) });
+      }
+    }
+    if (booked) break;
+    const transcript = turns.map(x => `${x.role === 'lead' ? 'Lead' : 'Setter'}: ${x.text}`).join('\n');
+    let reply = '...'; try { reply = await leadReply(avatar, style, curveball, transcript, t === 0); } catch (e) {}
+    turns.push({ role: 'lead', text: reply });
+    c.messages.push({ dir: 'in', text: reply, t: Date.now() });
+    if (style.id === 'goes_silent' && t > 3 && Math.random() < 0.5) break;
+  }
+  return { id: `sim_${String(idx).padStart(3, '0')}`, avatar: avatar.label, answerStyle: style.id, curveball: curveball || null, status: 'unreviewed', outcome: booked ? 'booked' : 'ended', turns };
+}
+
+app.get('/api/sim-run', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(simRunStatus); });
+app.post('/api/sim-run', async (req, res) => {
+  if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'no brain key on server' });
+  if (simRunBusy) return res.status(409).json({ error: 'a sim run is already in progress', status: simRunStatus });
+  const n = Math.min(Math.max(parseInt((req.body && req.body.n) || '6', 10), 1), 30);
+  const append = !!(req.body && req.body.append);
+  simRunBusy = true; simRunStatus = { running: true, done: 0, total: n, startedAt: Date.now() };
+  res.json({ ok: true, started: n, note: 'generating in background — watch /sim-review.html' });
+  (async () => {
+    const { AVATARS, ANSWER_STYLES, CURVEBALLS } = SIM_LIB;
+    let out = append ? ((await getSpecial(SIMS_ID, simsMem)) || []) : [];
+    const base = out.length;
+    for (let i = 0; i < n; i++) {
+      const avatar = AVATARS[i % AVATARS.length];
+      const style = ANSWER_STYLES[Math.floor(Math.random() * ANSWER_STYLES.length)];
+      const cb = Math.random() < 0.4 ? CURVEBALLS[Math.floor(Math.random() * CURVEBALLS.length)] : null;
+      try { out.push(await runOneSim(base + i + 1, avatar, style, cb)); } catch (e) {}
+      simsMem = out; await putSpecial(SIMS_ID, '(sims)', out); // save progressively so they appear as they finish
+      simRunStatus.done = i + 1;
+    }
+    simRunBusy = false; simRunStatus.running = false;
+  })();
+});
 app.get('/api/sim-comments', async (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ comments: await getSpecial(SIM_COMMENTS_ID, simCommentsMem) || [] }); });
 app.post('/api/sim-comments', async (req, res) => { const comments = req.body && req.body.comments; if (!Array.isArray(comments)) return res.status(400).json({ error: 'no comments[]' }); simCommentsMem = comments; res.json(await putSpecial(SIM_COMMENTS_ID, '(sim comments)', comments)); });
 
