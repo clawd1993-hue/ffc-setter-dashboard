@@ -463,9 +463,11 @@ const OPENER_RE = /^((?:got it|gotcha|nice|love that|ah|i hear you|fair enough|f
 const SAY_ONCE = [
   { topic: 'price', sig: /different types of packages/i,
     strip: /we have different types of packages[^.?!]*?best fit for you[,.]?\s*/i,
-    escalation: "Totally get wanting a number — exact pricing depends on your situation, which is exactly what the coach nails down on the call. Let's get you that real figure." },
+    escalation: "Totally get wanting a number, exact pricing depends on your situation, which is exactly what the coach nails down on the call. Let's get you that real figure." },
 ];
-// enforce say-once on composed message steps; mark topic addressed on first use, strip on repeat
+// kill em/en-dashes (classic AI tell) — replace with a comma. Leaves regular hyphens (payment-plan) alone.
+function _noAiDash(s) { return (s || '').replace(/\s*[—–]\s*/g, ', ').replace(/,\s*,/g, ',').replace(/^\s*,\s*/, '').replace(/\s{2,}/g, ' ').trim(); }
+// final post-process on composed message steps: say-once dedup + de-AI-dash
 function applySayOnce(steps, c) {
   c.addressed = c.addressed || {};
   for (const st of steps) {
@@ -476,6 +478,7 @@ function applySayOnce(steps, c) {
         else c.addressed[so.topic] = true;
       }
     }
+    st.text = _noAiDash(st.text);
   }
   return steps.filter(s => s.type === 'flow' || (s.text && s.text.trim())); // drop any step emptied by stripping
 }
