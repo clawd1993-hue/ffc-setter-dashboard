@@ -521,7 +521,7 @@ const SAY_ONCE = [
 const PRICE_DEFLECT_LINE = SAY_ONCE[0].line;
 const BOOK_REASSURE = "For sure, the goal of the call is to see if there's a fit and our head coach can walk you through how everything works.";
 // price-blocker ladder lines (rung 3 and 4) — a lead who keeps shoving for a number after the escalation
-const PRICE_FINAL_PUSH = "I hear you, and honestly the real number comes down to what setup fits you best, which is exactly what the coach locks in on the call. Want me to grab you a time so you get it straight from them?";
+const PRICE_FINAL_PUSH = "Like I said, we've got different packages and the goal is always to make it work for you based on your situation. I wouldn't be able to give you exact numbers here, but our head coach will run you through everything on the call, sound good?";
 const PRICE_HOLD_SHORT = "Like I said, that's exactly what the call is for 🙏 want me to grab you a slot?";
 // price question RIGHT at the booking link, never deflected before → stack the main price deflect + the call-reframe into one line, one "For sure", then the link
 const BOOK_PRICE_COMBO = "For sure, " + PRICE_DEFLECT_LINE.charAt(0).toLowerCase() + PRICE_DEFLECT_LINE.slice(1) + " " + BOOK_REASSURE.replace(/^For sure,\s*the\b/i, 'The');
