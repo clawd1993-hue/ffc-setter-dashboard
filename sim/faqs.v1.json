@@ -1,0 +1,59 @@
+{
+ "faqs": [
+  {
+   "id": "skeptical",
+   "trigger": "I'm skeptical / sounds too good to be true / nervous about investing in something new",
+   "answer": "I totally get you, it's smart to be cautious, and to be transparent it's definitely not a get-rich-quick kinda scheme, it takes time and commitment, but we'll be by your side every step of the way."
+  },
+  {
+   "id": "how_know_works",
+   "trigger": "how do I know it actually works / how do I know it's real",
+   "answer": "And after all, you found us and joined the challenge through the same online process, so you've already experienced that it's real business and real people behind some of these opportunities."
+  },
+  {
+   "id": "experienced_skeptic",
+   "trigger": "skeptical / lots of money / doesn't want a call, but ONLY if they've tried selling digital products before",
+   "answer": "That said, Elite isn't necessarily for everyone, especially if you're confident you can get the same results on your own. But given your past experience trying to sell digital products, I'm curious, do you feel you'd be better off starting from scratch again, or building on something that's already been tested with a team helping you along the way?"
+  },
+  {
+   "id": "diy_how_long",
+   "trigger": "how much longer will it take me doing it myself / can't I just do it on my own",
+   "answer": "You can absolutely do it yourself, it may just take a little longer depending on your experience and how much time you can dedicate to learning and implementing everything. Building and testing a brand-new offer, funnel and ads can also get quite expensive before you find what works. That's why I usually recommend starting with a proven done-for-you offer, you learn skills like ads, copywriting and funnels while selling something that's already been tested, rather than figuring out every piece from scratch. Then once you're consistently generating sales, you can use that experience and cash flow to build your own product later."
+  },
+  {
+   "id": "wont_work",
+   "trigger": "I don't want to spend money on something that won't work",
+   "answer": "I totally understand. Would you say that if you had all the tools, resources, support, a proven system, 1-1 hands-on help from the founder who's been doing this 10+ years, and a tested offer that's already working and generating sales, and all you had to do was follow the system step by step and stay consistent, do you still think it wouldn't work? Because at that point it's more of a fear than a fact 🙏 The fact is you're being given all the tools, support and value needed to make this work. Just like anything in life, the people who stick with it and stay consistent are the ones who become successful."
+  },
+  {
+   "id": "upsells",
+   "trigger": "it always asks for more upgrades and upsells / why so many add-ons",
+   "answer": "There are optional add-ons (like extra training or niche packs) that some people choose based on what they feel will benefit them most, but the core program already gives you everything you need to get started 🙏 It's no different from McDonald's asking if you want to make it a meal or add fries. You wouldn't assume those extras were included in the original purchase, they're simply optional add-ons you can take or decline. None of them take away from what you originally bought or stop you going through the Challenge 👍"
+  },
+  {
+   "id": "competition",
+   "trigger": "won't we all be competing / the market is saturated / what differentiates me from others",
+   "answer": "For sure, totally hear you, so the main concern is basically just competition right? You definitely don't need to worry about that, and here's why. A) We're constantly updating the funnel and testing new ads, so you're always launching the latest best-performing creative, not the same thing everyone else ran six months ago. And B) most importantly, the market here is massive. 'How to make money online' has been a thing for over a century. There's 3+ billion people who hate their job and want a way out. We'd need thousands of students each spending thousands a day to even put a dent in it. You're super early :)"
+  },
+  {
+   "id": "elite_success_rate",
+   "trigger": "success rate of the Elite program / what's my guarantee",
+   "answer": "Every student who launched now has their business up and running. Of course there are people who haven't launched yet or didn't continue to build, they didn't show up for themselves, so they don't have the results. That's why we're very picky about who we work with, because we genuinely care about each student, but they have to be willing to put in the work from their side. It's like going to the gym and I'm the personal trainer, I can't grow the muscles for you, if that makes sense :)"
+  },
+  {
+   "id": "challenge_results",
+   "trigger": "success rate / results of the 10-day FF Challenge / where are the testimonials",
+   "answer": "For sure! There's a big mix on the landing page you purchased the challenge on :) Most of the specific case studies, testimonials and live results we share come from students inside our Elite program, simply because we're able to track their progress much more closely through the hands-on support and done-for-you setup."
+  },
+  {
+   "id": "pay_upfront",
+   "trigger": "why pay upfront / why can't I pay you back from the profits I make",
+   "answer": "Yes we're super confident in our program, but look at it this way, you'd pay a personal trainer upfront to get you in shape, structure your meal plan and spend time with you at the gym, right? Not only after you've already lost the weight. The results come from following that structure and staying consistent. It's the same here, we're actually building the entire system for you, funnel, products, first ad, 1-1 support, and that upfront work, time and resources have to be covered. If we built entire businesses for everyone for free and just hoped they'd pay once they made money, we'd have no business left. It's simply how providing a professional service works 🙏"
+  },
+  {
+   "id": "age_tech",
+   "trigger": "I'm too old / not tech savvy / worried about my age or tech skills",
+   "answer": "Age and technical experience aren't the issue. We have students in their 60s and 70s doing extremely well because the program is designed for beginners who simply follow the system step by step."
+  }
+ ]
+}

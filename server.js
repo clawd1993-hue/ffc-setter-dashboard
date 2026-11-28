@@ -374,7 +374,7 @@ async function suggestV2(c) {
   c.pastGate = c.pastGate || false;  // once the Gate is reached, the script itself handles money → no standalone price deflection
   const firstMove = !c.messages.some(m => m.dir === 'out');
   let target = null, openerSwap = '', priceReply = '', brackets = {}, thought = '', stay = false, holding = '', preBookQuestion = false, preBookPrice = false, faq = null;
-  const FAQS = [...FAQS_SEED, ...((tree.faqs || []).filter(f => f && f.id && f.answer))]; // tree.faqs (whiteboard panel) override/extend the seed
+  const FAQS = await getFaqs(); // swappable DB (Supabase __faqs__) — see /api/faqs
   if (firstMove) {
     target = entry;
   } else {
@@ -511,14 +511,8 @@ const BOOK_REASSURE = "For sure, the goal of the call is to see if there's a fit
 // price question RIGHT at the booking link, never deflected before → stack the main price deflect + the call-reframe into one line, one "For sure", then the link
 const BOOK_PRICE_COMBO = "For sure, " + PRICE_DEFLECT_LINE.charAt(0).toLowerCase() + PRICE_DEFLECT_LINE.slice(1) + " " + BOOK_REASSURE.replace(/^For sure,\s*the\b/i, 'The');
 const firesBooking = n => (n.steps || []).some(s => s.t === 'flow' && /booking link/i.test(s.name || ''));
-// FAQ layer: a lead throws a random question mid-flow → answer it (msg 1, canned/verbatim) then bridge back to the normal move (msg 2, "and "+script). PRICE is NOT here (own machinery). SEED set — Michael supplies the real list; also merges tree.faqs when the whiteboard panel exists.
-const FAQS_SEED = [
-  { id: 'legit',      trigger: 'is this legit / real / a scam / too good to be true / does it actually work', answer: "Haha totally fair to ask. Yeah it's a real established program with thousands of students, it's legit, you've just gotta actually put the work in." },
-  { id: 'following',  trigger: 'do i need a big following / audience / followers / to show my face',           answer: "Nope, not at all. The whole thing is faceless, you don't need any followers or to show your face." },
-  { id: 'experience', trigger: 'do i need experience / tech skills / to be techy / have done this before',      answer: "Not at all, most people start with zero experience, it's built for total beginners and we walk you through every step." },
-  { id: 'time',       trigger: 'how much time does it take / i am busy / do i have enough time',                 answer: "You can do it around a job, most people start with an hour or so a day, it's about being consistent not grinding all day." },
-  { id: 'country',    trigger: 'does it work in my country / outside the US / where i live',                    answer: "Yeah it works anywhere, our students are all over the world, none of it is location-locked." },
-];
+// FAQ layer: a lead throws a random question/objection mid-flow → answer it (msg 1, canned/verbatim) then bridge back to the normal move (msg 2, "and "+script). PRICE is NOT here (own machinery).
+// The FAQ DATABASE is a swappable Supabase row (__faqs__) — replace the whole thing with one POST /api/faqs, no code change. See getFaqs().
 // "and "+script, lowercasing the first letter so msg 2 reads as a continuation ("Nice, so.." → "and nice, so..")
 const _bridgeOn = s => { const t = (s || '').replace(/^\s+/, ''); const i = t.search(/[A-Za-z]/); return 'and ' + (i >= 0 ? t.slice(0, i) + t[i].toLowerCase() + t.slice(i + 1) : t); };
 // SHORT re-ask: after answering an FAQ with no forward move, re-pose just the node's QUESTION, not its whole body. Grab the last clause before the final "?" (cut at the last sentence-ender/emoji boundary), strip a leading and/so so the bridge doesn't double up.
@@ -904,6 +898,20 @@ const SIM_TREE_ID = '__sim_tree__';
 let simTreeMem = null;
 app.get('/api/sim-tree', async (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ tree: await getSpecial(SIM_TREE_ID, simTreeMem) || null }); });
 app.post('/api/sim-tree', async (req, res) => { const tree = req.body && req.body.tree; if (!tree || typeof tree !== 'object') return res.status(400).json({ error: 'no tree' }); simTreeMem = tree; res.json(await putSpecial(SIM_TREE_ID, '(sim tree)', tree)); });
+
+// ===== FAQ DATABASE (swappable) — one Supabase row, replace the whole thing with one POST (no code change, no redeploy) =====
+const FAQS_ID = '__faqs__';
+let faqsMem = null, _faqsCache = { list: null, at: 0 };
+async function getFaqs() {
+  if (_faqsCache.list && Date.now() - _faqsCache.at < 60000) return _faqsCache.list;
+  let list = [];
+  try { list = await getSpecial(FAQS_ID, faqsMem); } catch (e) {}
+  list = (Array.isArray(list) ? list : []).filter(f => f && f.id && f.answer); // only valid entries; empty = FAQ layer simply doesn't fire (fails safe)
+  _faqsCache = { list, at: Date.now() };
+  return list;
+}
+app.get('/api/faqs', async (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ faqs: await getSpecial(FAQS_ID, faqsMem) || [] }); });
+app.post('/api/faqs', async (req, res) => { const faqs = req.body && req.body.faqs; if (!Array.isArray(faqs)) return res.status(400).json({ error: 'no faqs[]' }); faqsMem = faqs; _faqsCache = { list: null, at: 0 }; res.json(await putSpecial(FAQS_ID, '(faqs)', faqs)); }); // POST replaces the ENTIRE database
 
 // ===== SIM ENGINE — lead-bot ↔ the REAL suggest() brain. Fully offline: never sends to ManyChat =====
 const SIM_LIB = (() => { try { return require('./sim/avatars'); } catch (e) { return { AVATARS: [], ANSWER_STYLES: [], CURVEBALLS: [] }; } })();
