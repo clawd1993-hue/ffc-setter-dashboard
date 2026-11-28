@@ -418,15 +418,14 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
     preBookQuestion = parsed.preBookQuestion === true; preBookPrice = parsed.preBookPrice === true;
     if (parsed.faqId) { faq = FAQS.find(f => f.id === parsed.faqId) || null; if (faq && /price|cost|payment/i.test(faq.id)) faq = null; } // price is never an FAQ — defer to the price machinery
     if (c.pastGate) priceReply = ''; // from the Gate onward, money talk is on-script — the branches handle it, no deflection
-    // PRICE-BLOCKER LADDER: a hard blocker who keeps demanding a number must NEVER get the escalation line twice.
-    // deflect (main packages line) → escalate once → firm pivot to the call once → short hold. Each rung fires at most once.
+    // PRICE-BLOCKER LADDER (code-owned, deterministic — the model only FLAGS that price came up via a non-empty priceReply;
+    // code decides the exact line so it can NEVER paraphrase or repeat). Rungs, each fires at most once:
+    //   1 main packages deflect → 2 escalation → 3 firm pivot to the call → 4 short hold.
     if (priceReply) {
-      const nrm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (nrm(priceReply).includes(nrm(SAY_ONCE[0].escalation).slice(0, 28))) { // model reached for the escalation line
-        if (!c.priceEscalated) c.priceEscalated = true;                         // 1st escalation → allow it
-        else if (!c.priceFinalPushed) { priceReply = PRICE_FINAL_PUSH; c.priceFinalPushed = true; } // 2nd → firm pivot, don't repeat
-        else priceReply = PRICE_HOLD_SHORT;                                     // 3rd+ → short hold firm
-      }
+      if (!c.addressed.price) priceReply = PRICE_DEFLECT_LINE;                                     // rung 1 (addressed.price is set AFTER applySayOnce)
+      else if (!c.priceEscalated) { priceReply = SAY_ONCE[0].escalation; c.priceEscalated = true; } // rung 2
+      else if (!c.priceFinalPushed) { priceReply = PRICE_FINAL_PUSH; c.priceFinalPushed = true; }  // rung 3
+      else priceReply = PRICE_HOLD_SHORT;                                                          // rung 4+
     }
     if (parsed.facts && typeof parsed.facts === 'object') Object.assign(c.leadProfile, parsed.facts);
     if (parsed.choice === 'stay' || parsed.choice === -1) { stay = true; holding = (parsed.holdingReply || '').trim(); }
@@ -453,8 +452,11 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
     if (faq) { // known question + no forward move → answer it (msg 1), then re-pose the current question bridged (msg 2)
       steps.push({ type: 'message', text: faq.answer });
       steps.push({ type: 'message', text: _bridgeOn(_shortReAsk(byId[c.nodeId] || entry)) });
+    } else if (priceReply) { // price deflect (code-owned rung) → clean deflect (msg 1) + short re-ask (msg 2); ignore model holding so it can't duplicate the line
+      steps.push({ type: 'message', text: priceReply });
+      steps.push({ type: 'message', text: _bridgeOn(_shortReAsk(byId[c.nodeId] || entry)) });
     } else {
-      steps.push({ type: 'message', text: (priceReply ? priceReply + ' ' : '') + (holding || 'One sec — let me sort that for you.') });
+      steps.push({ type: 'message', text: holding || 'One sec, let me sort that for you.' });
     }
     return { steps: applySayOnce(steps, c), nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85 };
   }
