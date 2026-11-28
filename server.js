@@ -368,6 +368,7 @@ async function suggestV2(c) {
   c.sent = c.sent || new Set();      // node ids already sent — never repeat a block
   c.stayed = c.stayed || {};         // nodes we've already "stayed"/deflected on once
   c.addressed = c.addressed || {};   // topics already handled (price…) — don't re-explain, just acknowledge + advance
+  c.pastGate = c.pastGate || false;  // once the Gate is reached, the script itself handles money → no standalone price deflection
   const firstMove = !c.messages.some(m => m.dir === 'out');
   let target = null, openerSwap = '', priceReply = '', brackets = {}, thought = '', stay = false, holding = '';
   if (firstMove) {
@@ -406,6 +407,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
     // INVARIANT: a non-terminal node NEVER dies. If the model failed, keyword-advance instead of ending.
     if (!parsed) parsed = { choice: _heuristicChoice(lastIn ? lastIn.text : '', opts), facts: {} };
     openerSwap = (parsed.openerSwap || '').trim(); priceReply = (parsed.priceReply || '').trim();
+    if (c.pastGate) priceReply = ''; // from the Gate onward, money talk is on-script — the branches handle it, no deflection
     if (parsed.facts && typeof parsed.facts === 'object') Object.assign(c.leadProfile, parsed.facts);
     if (parsed.choice === 'stay' || parsed.choice === -1) { stay = true; holding = (parsed.holdingReply || '').trim(); }
     else { let idx = parseInt(parsed.choice, 10); if (isNaN(idx) || !opts[idx]) idx = _heuristicChoice(lastIn ? lastIn.text : '', opts); target = byId[opts[idx].id]; }
@@ -433,7 +435,12 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
       let txt = fillBrackets(s.text, brackets);
       if (firstMsg) {
         if (openerSwap) txt = txt.replace(OPENER_RE, (m, g1) => openerSwap.replace(/[.!,…\s]+$/, '').trim() + g1.trim().slice(-1) + ' '); // swap the script's OWN opener, keep its punctuation (only if it starts with a recognised opener)
-        if (priceReply) txt = priceReply.trim() + ' ' + txt;                                             // price deflect = a legit prepend (say-once guarded)
+        if (priceReply) {                                                                                // price deflect: insert AFTER the script's own opener as its own sentence → [opener]. [deflection]. [body]
+          const pr = priceReply.trim().replace(/[.!,…\s]+$/, '') + '.';
+          const m = txt.match(OPENER_RE);
+          if (m) txt = m[0].trim().replace(/[,;:\s]+$/, '.') + ' ' + pr + ' ' + txt.slice(m[0].length);
+          else txt = pr + ' ' + txt;                                                                     // no opener → deflection leads, then body
+        }
         firstMsg = false;
       }
       steps.push({ type: 'message', text: txt });
@@ -450,6 +457,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
     for (const s of ns) { if (s.t === 'flow') steps.push({ type: 'flow', name: s.name, flow_ns: flowNsByName(s.name) }); else steps.push({ type: 'message', text: fillBrackets(s.text, {}) }); }
     c.nodeId = nxt.id; c.sent.add(nxt.id); chainFrom = nxt;
   }
+  if (c.nodeId === 'gate') c.pastGate = true; // reached the Gate → from here the script handles money itself
   const finalSteps = applySayOnce(steps, c);
   return { steps: finalSteps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85, empty: !finalSteps.length };
 }
