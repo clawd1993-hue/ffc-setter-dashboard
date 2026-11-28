@@ -523,7 +523,8 @@ const FAQS_SEED = [
 const _bridgeOn = s => { const t = (s || '').replace(/^\s+/, ''); const i = t.search(/[A-Za-z]/); return 'and ' + (i >= 0 ? t.slice(0, i) + t[i].toLowerCase() + t.slice(i + 1) : t); };
 // SHORT re-ask: after answering an FAQ with no forward move, re-pose just the node's QUESTION, not its whole body. Grab the last clause before the final "?" (cut at the last sentence-ender/emoji boundary), strip a leading and/so so the bridge doesn't double up.
 function _shortReAsk(node) {
-  let t = _msgText(node).replace(/\s*\|\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  const msgs = (node.steps || []).filter(s => s.t === 'msg' && s.text); // the question lives in the LAST message step — ignore VN-intro steps
+  let t = (msgs.length ? msgs[msgs.length - 1].text : (node.text || '')).replace(/\s{2,}/g, ' ').trim();
   const qi = t.lastIndexOf('?');
   let clause;
   if (qi === -1) { const s = (t.match(/[^.?!]*[.?!]/g) || [t]).map(x => x.trim()).filter(Boolean); clause = s.pop() || t; }
