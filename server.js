@@ -499,11 +499,15 @@ function _heuristicChoice(leadText, opts) {
 async function _fillBracketsAI(client, node, profile, leadText) {
   const text = _msgText(node); const brs = [...new Set((text.match(/\[[^\]]+\]/g) || []))];
   if (!brs.length) return {};
-  const sys = `Fill these script placeholders for THIS lead. For a "[a / b / c]" slash-placeholder, pick the ONE that fits.
+  const sys = `Fill the [ ] placeholders in this script message so the FINISHED sentence reads as natural, grammatically-correct English. Read the whole sentence with your fill substituted in — it MUST flow.
+MESSAGE: "${text}"
+Rules:
+- For a "[a / b / c]" slash-placeholder, pick the ONE option that best fits this lead.
+- For an open placeholder (e.g. [their goal]), use the lead's OWN words, but adapt them so the sentence is complete and correct — include any small connective words needed (e.g. make "want [their goal]" read "want to supplement the income", not "want supplement the income"). Match the grammar of the surrounding words.
+- Keep it short and in the lead's voice.
 Lead profile: ${JSON.stringify(profile)}
 Lead just said: "${leadText}"
-Placeholders: ${JSON.stringify(brs)}
-Output ONLY JSON mapping each exact placeholder string to a short value, e.g. {"${brs[0]}":"..."}.`;
+Output ONLY JSON mapping each exact placeholder string to its filled value, e.g. {"${brs[0]}":"..."}.`;
   const r = await client.messages.create({ model: 'claude-sonnet-5', max_tokens: 300, system: sys, messages: [{ role: 'user', content: 'Fill them. JSON only.' }] }).catch(() => null);
   const txt = r ? ((r.content.find(b => b.type === 'text') || {}).text || '') : '';
   try { const i = txt.indexOf('{'), j = txt.lastIndexOf('}'); return JSON.parse(txt.slice(i, j + 1)); } catch (e) { return {}; }
