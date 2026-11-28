@@ -369,7 +369,7 @@ async function suggestV2(c) {
   c.stayed = c.stayed || {};         // nodes we've already "stayed"/deflected on once
   c.addressed = c.addressed || {};   // topics already handled (price…) — don't re-explain, just acknowledge + advance
   const firstMove = !c.messages.some(m => m.dir === 'out');
-  let target = null, opener = '', brackets = {}, thought = '', stay = false, holding = '';
+  let target = null, openerSwap = '', priceReply = '', brackets = {}, thought = '', stay = false, holding = '';
   if (firstMove) {
     target = entry;
   } else {
@@ -392,9 +392,11 @@ The lead just replied: "${lastIn ? lastIn.text : ''}"
 Pick the ONE option that matches how they answered:
 ${opts.map((o, i) => `${i}. WHEN ${o.condition} → "${o.text.slice(0, 110)}"`).join('\n')}
 
-RULES: ALWAYS advance — pick a numbered option. If they asked about PRICE, put a short deflection in "opener" but STILL pick the forward option. Use "stay" ONLY for a rare unanswerable non-price aside.
-DON'T RE-EXPLAIN what you've already addressed — just acknowledge their point in ONE breath and continue.${Object.keys(c.addressed).length ? ` Already addressed: ${Object.keys(c.addressed).join(', ')} — do NOT repeat those explanations. If the lead is BLOCKING (refuses to move until they get a specific answer, e.g. "just tell me the number"), use this escalation EXACTLY in the opener: "${(SAY_ONCE.find(s => c.addressed[s.topic]) || {}).escalation || ''}"` : ''}
-Output ONLY compact JSON: {"choice":<number or "stay">,"opener":"<tiny acknowledgment or empty>","facts":{"<key>":"<value learned this turn>"},"holdingReply":"<only if stay>"}`;
+RULES: ALWAYS advance — pick a numbered option. Use "stay" ONLY for a rare unanswerable aside.
+The scripted line is sent VERBATIM — it already has its own opener. Do NOT write your own acknowledgment on top of it.
+- "openerSwap": usually EMPTY. Fill it with 1-3 words ONLY if the scripted line's opener would be tone-deaf — i.e. the lead just shared something HEAVY/negative (loss, bad news, real distress) AND the script opens upbeat ("Nice", "Love that", "Perfect"). Then give a short fitting replacement for just that opener, e.g. "Damn, sorry to hear that". It REPLACES the script's first word only; it never adds on top.
+- "priceReply": EMPTY unless the lead asked about PRICE — then a short deflection to prepend (still pick the forward option).${Object.keys(c.addressed).length ? ` Already addressed: ${Object.keys(c.addressed).join(', ')} — do NOT repeat those; if the lead is BLOCKING (refuses to move until they get a number, e.g. "just tell me the number"), set priceReply to EXACTLY: "${(SAY_ONCE.find(s => c.addressed[s.topic]) || {}).escalation || ''}"` : ''}
+Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceReply":"","facts":{"<key>":"<value learned this turn>"},"holdingReply":"<only if stay>"}`;
     let parsed = null;
     for (let a = 0; a < 2 && !parsed; a++) {
       const r = await client.messages.create({ model: 'claude-sonnet-5', max_tokens: 250, system: sysA, messages: [{ role: 'user', content: 'Decide. JSON only.' }] }).catch(() => null);
@@ -402,8 +404,8 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"opener":"<tiny acknowled
       try { const i = txt.indexOf('{'), j = txt.lastIndexOf('}'); parsed = JSON.parse(txt.slice(i, j + 1)); } catch (e) {}
     }
     // INVARIANT: a non-terminal node NEVER dies. If the model failed, keyword-advance instead of ending.
-    if (!parsed) parsed = { choice: _heuristicChoice(lastIn ? lastIn.text : '', opts), opener: '', facts: {} };
-    opener = (parsed.opener || '').trim();
+    if (!parsed) parsed = { choice: _heuristicChoice(lastIn ? lastIn.text : '', opts), facts: {} };
+    openerSwap = (parsed.openerSwap || '').trim(); priceReply = (parsed.priceReply || '').trim();
     if (parsed.facts && typeof parsed.facts === 'object') Object.assign(c.leadProfile, parsed.facts);
     if (parsed.choice === 'stay' || parsed.choice === -1) { stay = true; holding = (parsed.holdingReply || '').trim(); }
     else { let idx = parseInt(parsed.choice, 10); if (isNaN(idx) || !opts[idx]) idx = _heuristicChoice(lastIn ? lastIn.text : '', opts); target = byId[opts[idx].id]; }
@@ -420,14 +422,22 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"opener":"<tiny acknowled
   // compose (text always comes from the node → can't be blank)
   const steps = [];
   if (stay) {
-    steps.push({ type: 'message', text: (opener ? opener + ' ' : '') + (holding || 'One sec — let me sort that for you.') });
+    steps.push({ type: 'message', text: (priceReply ? priceReply + ' ' : '') + (holding || 'One sec — let me sort that for you.') });
     return { steps: applySayOnce(steps, c), nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85 };
   }
   const tsteps = target.steps || (target.text ? [{ t: 'msg', text: target.text }] : []);
-  let openerUsed = false;
+  let firstMsg = true;
   for (const s of tsteps) {
     if (s.t === 'flow') steps.push({ type: 'flow', name: s.name, flow_ns: flowNsByName(s.name) });
-    else { let txt = fillBrackets(s.text, brackets); if (!openerUsed && opener) { txt = opener + ' ' + txt; openerUsed = true; } steps.push({ type: 'message', text: txt }); }
+    else {
+      let txt = fillBrackets(s.text, brackets);
+      if (firstMsg) {
+        if (openerSwap) txt = txt.replace(OPENER_RE, (m, g1) => openerSwap.replace(/[.!,…\s]+$/, '').trim() + g1.trim().slice(-1) + ' '); // swap the script's OWN opener, keep its punctuation (only if it starts with a recognised opener)
+        if (priceReply) txt = priceReply.trim() + ' ' + txt;                                             // price deflect = a legit prepend (say-once guarded)
+        firstMsg = false;
+      }
+      steps.push({ type: 'message', text: txt });
+    }
   }
   c.nodeId = target.id; c.sent.add(target.id);
   // CHAIN continue-arrows (no-wait): fire straight into the next message(s) in the SAME turn, no pause for a reply
@@ -445,6 +455,8 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"opener":"<tiny acknowled
 }
 // a "continue" arrow = fire straight into the next message without waiting for a reply (marked cont=true or label >> / ⚡)
 function _isCont(e) { return !!(e && (e.cont || /(^|\s)(>>|⚡|continue)\b/i.test(e.label || ''))); }
+// recognised SCRIPT openers — a swap ONLY ever replaces one of these (so the body can never be touched). Matches the leading ack phrase up to the first . , or !.
+const OPENER_RE = /^((?:got it|gotcha|nice|love that|ah|i hear you|fair enough|fair|perfect|cool|sure|okay|ok|great|sweet|yeah|awesome|amazing|right|word|totally|for sure|haha)\b[^.?!,]*?[.!,])\s*/i;
 
 // SAY-ONCE lines: a canned deflection is said at most ONCE per convo. After that, code STRIPS a repeat
 // (keeps the human ack + the forward step). On a genuine block, the model uses the escalation line instead.
