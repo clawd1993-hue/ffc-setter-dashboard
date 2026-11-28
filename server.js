@@ -397,7 +397,7 @@ The lead just replied: "${lastIn ? lastIn.text : ''}"
 Pick the ONE option that matches how they answered:
 ${opts.map((o, i) => `${i}. WHEN ${o.condition} → "${o.text.slice(0, 110)}"`).join('\n')}
 
-RULES: ALWAYS advance — pick a numbered option. Use "stay" ONLY for a rare unanswerable aside.
+RULES: If the lead ANSWERED your question, advance — pick the numbered option. Use "stay" when they did NOT answer it — e.g. they only asked a question of their own (you'll set faqId) or made an off-topic aside — so we handle that and re-ask, instead of guessing a branch they never chose.
 The scripted line is sent VERBATIM — it already has its own opener. Do NOT write your own acknowledgment on top of it.
 - "openerSwap": usually EMPTY. Fill it with 1-3 words ONLY if the scripted line's opener would be tone-deaf — i.e. the lead just shared something HEAVY/negative (loss, bad news, real distress) AND the script opens upbeat ("Nice", "Love that", "Perfect"). Then give a short fitting replacement for just that opener, e.g. "Damn, sorry to hear that". It REPLACES the script's first word only; it never adds on top.
 - "priceReply": EMPTY unless the lead asked about PRICE — then a short deflection to prepend (still pick the forward option).${Object.keys(c.addressed).length ? ` Already addressed: ${Object.keys(c.addressed).join(', ')} — do NOT repeat those; if the lead is BLOCKING (refuses to move until they get a number, e.g. "just tell me the number"), set priceReply to EXACTLY: "${(SAY_ONCE.find(s => c.addressed[s.topic]) || {}).escalation || ''}"` : ''}
