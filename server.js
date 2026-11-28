@@ -367,6 +367,7 @@ async function suggestV2(c) {
   c.leadProfile = c.leadProfile || {};
   c.sent = c.sent || new Set();      // node ids already sent — never repeat a block
   c.stayed = c.stayed || {};         // nodes we've already "stayed"/deflected on once
+  c.addressed = c.addressed || {};   // topics already handled (price…) — don't re-explain, just acknowledge + advance
   const firstMove = !c.messages.some(m => m.dir === 'out');
   let target = null, opener = '', brackets = {}, thought = '', stay = false, holding = '';
   if (firstMove) {
@@ -392,6 +393,7 @@ Pick the ONE option that matches how they answered:
 ${opts.map((o, i) => `${i}. WHEN ${o.condition} → "${o.text.slice(0, 110)}"`).join('\n')}
 
 RULES: ALWAYS advance — pick a numbered option. If they asked about PRICE, put a short deflection in "opener" but STILL pick the forward option. Use "stay" ONLY for a rare unanswerable non-price aside.
+DON'T RE-EXPLAIN what you've already addressed — just acknowledge their point in ONE breath and continue.${Object.keys(c.addressed).length ? ` Already addressed: ${Object.keys(c.addressed).join(', ')} — do NOT repeat those explanations. If the lead is BLOCKING (refuses to move until they get a specific answer, e.g. "just tell me the number"), use this escalation EXACTLY in the opener: "${(SAY_ONCE.find(s => c.addressed[s.topic]) || {}).escalation || ''}"` : ''}
 Output ONLY compact JSON: {"choice":<number or "stay">,"opener":"<tiny acknowledgment or empty>","facts":{"<key>":"<value learned this turn>"},"holdingReply":"<only if stay>"}`;
     let parsed = null;
     for (let a = 0; a < 2 && !parsed; a++) {
@@ -419,7 +421,7 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"opener":"<tiny acknowled
   const steps = [];
   if (stay) {
     steps.push({ type: 'message', text: (opener ? opener + ' ' : '') + (holding || 'One sec — let me sort that for you.') });
-    return { steps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85 };
+    return { steps: applySayOnce(steps, c), nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85 };
   }
   const tsteps = target.steps || (target.text ? [{ t: 'msg', text: target.text }] : []);
   let openerUsed = false;
@@ -438,10 +440,33 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"opener":"<tiny acknowled
     for (const s of ns) { if (s.t === 'flow') steps.push({ type: 'flow', name: s.name, flow_ns: flowNsByName(s.name) }); else steps.push({ type: 'message', text: fillBrackets(s.text, {}) }); }
     c.nodeId = nxt.id; c.sent.add(nxt.id); chainFrom = nxt;
   }
-  return { steps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85, empty: !steps.length };
+  const finalSteps = applySayOnce(steps, c);
+  return { steps: finalSteps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85, empty: !finalSteps.length };
 }
 // a "continue" arrow = fire straight into the next message without waiting for a reply (marked cont=true or label >> / ⚡)
 function _isCont(e) { return !!(e && (e.cont || /(^|\s)(>>|⚡|continue)\b/i.test(e.label || ''))); }
+
+// SAY-ONCE lines: a canned deflection is said at most ONCE per convo. After that, code STRIPS a repeat
+// (keeps the human ack + the forward step). On a genuine block, the model uses the escalation line instead.
+const SAY_ONCE = [
+  { topic: 'price', sig: /different types of packages/i,
+    strip: /we have different types of packages[^.?!]*?best fit for you[,.]?\s*/i,
+    escalation: "Totally get wanting a number — exact pricing depends on your situation, which is exactly what the coach nails down on the call. Let's get you that real figure." },
+];
+// enforce say-once on composed message steps; mark topic addressed on first use, strip on repeat
+function applySayOnce(steps, c) {
+  c.addressed = c.addressed || {};
+  for (const st of steps) {
+    if (st.type !== 'message' || !st.text) continue;
+    for (const so of SAY_ONCE) {
+      if (so.sig.test(st.text)) {
+        if (c.addressed[so.topic]) st.text = st.text.replace(so.strip, '').replace(/^\s*[,—–-]\s*/, '').replace(/\s{2,}/g, ' ').trim();
+        else c.addressed[so.topic] = true;
+      }
+    }
+  }
+  return steps.filter(s => s.type === 'flow' || (s.text && s.text.trim())); // drop any step emptied by stripping
+}
 // keyword-match the lead's reply to the best branch — the "never die" fallback when the model fumbles
 function _heuristicChoice(leadText, opts) {
   const tw = new Set(_toks(leadText)); let best = 0, bs = -1;
