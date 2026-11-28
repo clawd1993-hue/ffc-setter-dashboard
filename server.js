@@ -421,6 +421,12 @@ Output ONLY compact JSON: {"choice":<number or "stay">,"openerSwap":"","priceRep
     else if (stay) { c.stayed[cur.id] = 1; }
     if (!stay && target && c.sent.has(target.id)) { const u = opts.find(o => !c.sent.has(o.id)); if (u) target = byId[u.id]; else return { steps: [], empty: true, done: true }; }
     thought = stay ? 'off-script aside → brief hold, then re-ask' : `→ ${target.id}`;
+    // deterministic backstop at the booking step — a flaky model flag must NOT drop a real question
+    if (!stay && target && firesBooking(target)) {
+      const ll = (lastIn && lastIn.text || '').toLowerCase();
+      if (/\b(price|cost|how much|payment plan|afford|expensive|cheaper|installment|instal|pay)\b/.test(ll)) { preBookQuestion = true; preBookPrice = true; }
+      else if (ll.includes('?') || /\b(before i book|need to know|how long|is it legit|scam|guarantee|refund)\b/.test(ll)) preBookQuestion = true;
+    }
     // --- CALL B (only if the chosen block has [ ] brackets): fill them in isolation ---
     if (!stay && target && /\[[^\]]+\]/.test(_msgText(target))) {
       brackets = await _fillBracketsAI(client, target, c.leadProfile, lastIn ? lastIn.text : '');
