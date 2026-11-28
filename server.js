@@ -329,6 +329,101 @@ function parseSteps(out) {
   return [{ type: 'message', text: (out || '').trim() }]; // not JSON → treat whole thing as one message
 }
 
+// ======================= BRAIN v2 — state machine ("reason, then answer") =======================
+// Tracks current node + a running lead profile. Each turn = a small bounded decision at a KNOWN
+// position, then compose from the chosen node's verbatim text. Can't go blank, can't go off-script.
+function _treeMaps(tree) {
+  const byId = {}; (tree.nodes || []).forEach(n => { byId[n.id] = n; });
+  const outg = {}; (tree.edges || []).forEach(e => { (outg[e.from] = outg[e.from] || []).push(e); });
+  return { byId, outg };
+}
+function _msgText(n) { const s = n.steps || (n.text ? [{ t: 'msg', text: n.text }] : []); return s.filter(x => x.t !== 'flow').map(x => x.text).join(' | '); }
+function _entryNode(tree) { const inc = new Set((tree.edges || []).map(e => e.to)); return (tree.nodes || []).find(n => !inc.has(n.id)) || (tree.nodes || [])[0]; }
+// expand from a node through route junctions → the reachable SEND targets (message/button nodes) + the branch conditions to reach each
+function nextOptions(tree, nodeId) {
+  const { byId, outg } = _treeMaps(tree); const opts = []; const seenMsg = new Set(); const seenRoute = new Set();
+  (function walk(eid, labels, depth) {
+    if (depth > 8) return; const n = byId[eid]; if (!n) return;
+    if ((n.kind || 'msg') === 'route') { if (seenRoute.has(eid)) return; seenRoute.add(eid); (outg[eid] || []).forEach(e => walk(e.to, e.label ? labels.concat(e.label) : labels, depth + 1)); }
+    else { if (seenMsg.has(eid)) return; seenMsg.add(eid); opts.push({ id: eid, condition: labels.join(' / ') || '(continue)', text: _msgText(n), title: n.title || '' }); }
+  })(nodeId, [], 0);
+  // also allow stepping INTO the outgoing nodes directly (non-route) — handled above
+  (outg[nodeId] || []).forEach(e => { if ((byId[e.to] || {}).kind !== 'route' && !seenMsg.has(e.to)) { const n = byId[e.to]; seenMsg.add(e.to); opts.push({ id: e.to, condition: e.label || '(continue)', text: _msgText(n), title: n.title || '' }); } });
+  return opts;
+}
+function fillBrackets(text, brackets) {
+  return (text || '').replace(/\[[^\]]+\]/g, m => {
+    if (brackets && brackets[m] != null && String(brackets[m]).trim()) return brackets[m];
+    const inner = m.slice(1, -1);
+    return inner.includes('/') ? inner.split('/')[0].trim() : inner.trim(); // graceful fallback, never leave literal [ ]
+  });
+}
+async function suggestV2(c) {
+  if (!ANTHROPIC_API_KEY) return { steps: [], empty: true };
+  const tree = await getSpecial(SIM_TREE_ID, simTreeMem);
+  if (!tree || !tree.nodes || !tree.nodes.length) return { steps: [], empty: true };
+  const { byId } = _treeMaps(tree);
+  const entry = _entryNode(tree);
+  c.leadProfile = c.leadProfile || {};
+  const firstMove = !c.messages.some(m => m.dir === 'out');
+  let target = null, opener = '', brackets = {}, thought = '', stay = false, holding = '';
+  if (firstMove) {
+    target = entry;
+  } else {
+    const cur = byId[c.nodeId] || entry;
+    const opts = nextOptions(tree, cur.id);
+    if (!opts.length) return { steps: [], empty: true, done: true }; // terminal reached
+    const lastIn = [...c.messages].reverse().find(m => m.dir === 'in');
+    const recent = transcriptOf(c).split('\n').slice(-6).join('\n');
+    const sys = `You are Paul, an FFC DM setter running a SCRIPTED flow. Think first, then act.
+
+HARD RULES (always obey):
+${(tree.rules || []).map(r => '- ' + r).join('\n')}
+
+WHERE YOU ARE — you just sent this block:
+[${cur.id}] "${_msgText(cur)}"
+
+LEAD PROFILE so far (facts you've gathered about THIS lead — use these to fill [ ] brackets):
+${JSON.stringify(c.leadProfile)}
+
+THE LEAD JUST REPLIED: "${lastIn ? lastIn.text : ''}"
+
+Decide the next block to send based on how they answered. OPTIONS:
+${opts.map((o, i) => `${i}. WHEN: ${o.condition}\n   SENDS: "${o.text.slice(0, 160)}"`).join('\n')}
+
+If the lead asked something OFF-SCRIPT that none of the options answer, use "stay": give a SHORT on-brand holding reply (obey hard rules — e.g. deflect price) and we'll re-ask the current step.
+
+Output ONLY JSON:
+{"thought":"<1 line: their intent + why this branch>","choice":<option number, or "stay">,"newFacts":{"<key>":"<value>"},"opener":"<tiny opening acknowledgment or empty, per the verbatim rule>","brackets":{"<exact [bracket] substring from the chosen block>":"<value filled from the lead profile>"},"holdingReply":"<only if choice is stay>"}`;
+    const Anthropic = require('@anthropic-ai/sdk'); const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    let parsed = null;
+    for (let a = 0; a < 2 && !parsed; a++) {
+      const r = await client.messages.create({ model: 'claude-sonnet-5', max_tokens: 700, system: sys, messages: [{ role: 'user', content: recent + '\n\nDecide the next move. JSON only.' }] }).catch(() => null);
+      const txt = r ? ((r.content.find(b => b.type === 'text') || {}).text || '') : '';
+      try { const i = txt.indexOf('{'), j = txt.lastIndexOf('}'); parsed = JSON.parse(txt.slice(i, j + 1)); } catch (e) {}
+    }
+    if (!parsed) return { steps: [], empty: true };
+    thought = parsed.thought || ''; opener = (parsed.opener || '').trim(); brackets = parsed.brackets || {};
+    if (parsed.newFacts && typeof parsed.newFacts === 'object') Object.assign(c.leadProfile, parsed.newFacts);
+    if (parsed.choice === 'stay' || parsed.choice === -1) { stay = true; holding = (parsed.holdingReply || '').trim(); }
+    else { const idx = parseInt(parsed.choice, 10); target = (opts[idx] ? byId[opts[idx].id] : byId[opts[0].id]); }
+  }
+  // compose
+  const steps = [];
+  if (stay) {
+    steps.push({ type: 'message', text: (opener ? opener + ' ' : '') + (holding || 'One sec — let me sort that for you.') });
+    return { steps, nodeId: c.nodeId, thought, profile: c.leadProfile, confidence: 0.85 };
+  }
+  const tsteps = target.steps || (target.text ? [{ t: 'msg', text: target.text }] : []);
+  let openerUsed = false;
+  for (const s of tsteps) {
+    if (s.t === 'flow') steps.push({ type: 'flow', name: s.name, flow_ns: flowNsByName(s.name) });
+    else { let txt = fillBrackets(s.text, brackets); if (!openerUsed && opener) { txt = opener + ' ' + txt; openerUsed = true; } steps.push({ type: 'message', text: txt }); }
+  }
+  c.nodeId = target.id;
+  return { steps, nodeId: target.id, thought, profile: c.leadProfile, confidence: 0.85, empty: !steps.length };
+}
+
 // ---------- Follow-Up suggestion generator (Phase 1) ----------
 // The lead went quiet after we spoke. Draft the next NUDGE from Michael's proven FU bank,
 // fitting wherever the conversation actually is. Suggestion-only — a setter approves it.
@@ -692,13 +787,14 @@ function nearestNode(text, nodes) {
   return bs > 0.22 ? best : null;
 }
 
-async function runOneSim(idx, avatar, style, curveball) {
+async function runOneSim(idx, avatar, style, curveball, brain) {
   const nodes = await simTreeNodes();
   const c = { messages: [], mode: 'approve' }; // ad-hoc convo — never stored, never sent
   const turns = []; let booked = false; const MAX = 14;
   for (let t = 0; t < MAX; t++) {
-    let steps = [];
-    try { const s = await suggest(c); steps = s.steps || []; } catch (e) {}
+    let r = { steps: [] };
+    try { r = brain === 'v2' ? await suggestV2(c) : await suggest(c); } catch (e) {}
+    const steps = r.steps || [];
     if (!steps.length) break;
     for (const st of steps) {
       if (st.type === 'flow') {
@@ -709,7 +805,7 @@ async function runOneSim(idx, avatar, style, curveball) {
         if (st.name === 'Booking Link') booked = true;
       } else {
         c.messages.push({ dir: 'out', text: st.text, t: Date.now() });
-        turns.push({ role: 'setter', text: st.text, nodeId: nearestNode(st.text, nodes) });
+        turns.push({ role: 'setter', text: st.text, nodeId: brain === 'v2' ? (r.nodeId || null) : nearestNode(st.text, nodes), thought: brain === 'v2' ? r.thought : undefined });
       }
     }
     if (booked) break;
@@ -719,7 +815,7 @@ async function runOneSim(idx, avatar, style, curveball) {
     c.messages.push({ dir: 'in', text: reply, t: Date.now() });
     if (style.id === 'goes_silent' && t > 3 && Math.random() < 0.5) break;
   }
-  return { id: `sim_${String(idx).padStart(3, '0')}`, avatar: avatar.label, answerStyle: style.id, curveball: curveball || null, status: 'unreviewed', outcome: booked ? 'booked' : 'ended', turns };
+  return { id: `sim_${brain === 'v2' ? 'v2_' : ''}${String(idx).padStart(3, '0')}`, brain: brain || 'v1', avatar: avatar.label, answerStyle: style.id, curveball: curveball || null, status: 'unreviewed', outcome: booked ? 'booked' : 'ended', turns, profile: c.leadProfile || undefined };
 }
 
 app.get('/api/sim-run', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(simRunStatus); });
@@ -728,6 +824,7 @@ app.post('/api/sim-run', async (req, res) => {
   if (simRunBusy) return res.status(409).json({ error: 'a sim run is already in progress', status: simRunStatus });
   const n = Math.min(Math.max(parseInt((req.body && req.body.n) || '6', 10), 1), 30);
   const append = !!(req.body && req.body.append);
+  const brain = (req.body && req.body.brain) === 'v2' ? 'v2' : 'v1';
   simRunBusy = true; simRunStatus = { running: true, done: 0, total: n, startedAt: Date.now() };
   res.json({ ok: true, started: n, note: 'generating in background — watch /sim-review.html' });
   (async () => {
@@ -738,7 +835,7 @@ app.post('/api/sim-run', async (req, res) => {
       const avatar = AVATARS[i % AVATARS.length];
       const style = ANSWER_STYLES[Math.floor(Math.random() * ANSWER_STYLES.length)];
       const cb = Math.random() < 0.4 ? CURVEBALLS[Math.floor(Math.random() * CURVEBALLS.length)] : null;
-      try { out.push(await runOneSim(base + i + 1, avatar, style, cb)); } catch (e) {}
+      try { out.push(await runOneSim(base + i + 1, avatar, style, cb, brain)); } catch (e) {}
       simsMem = out; await putSpecial(SIMS_ID, '(sims)', out); // save progressively so they appear as they finish
       simRunStatus.done = i + 1;
     }
