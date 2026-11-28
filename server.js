@@ -208,38 +208,49 @@ async function enrichRealName(c) {
 }
 
 // ---------- the 7-Labs DM-setting playbook (the AI's reference for the ideal convo arc) ----------
-const MAIN_SCRIPT = `FACELESS FUNNEL CHALLENGE — DM-SETTING SCRIPT (7 LABS, "Paul")
-GOLDEN RULE: when there's a LIVE conversation, work the live chat to book them — be human, show passion.
-
-ARC: Welcome VN (greeting) → STEP 1 (tried online before / first look?) → bridge → "What is FFC" VN → "watched the first video?" → STEP 2 "why now?" → STEP 3 (acknowledge their why + dig: situation + invested-before/what-was-missing) → STEP 4 THE GATE (every lead, before ANY link) → branch 🟢/🟡/🔴.
-
-AUTOMATIONS — what each one already SAYS (so you NEVER repeat its content in your own text):
-- "Welcome VN" = the opening greeting voice note. It already says: "Hey, it's Paul here! Congrats on taking the first step, excited to connect and help you get started. Let's dive in and get you to that first sale!" (greets them by name). → So right after firing Welcome VN, your text is ONLY the clean Step 1 question — do NOT write "hey", "hi", or "Paul here" again.
-- "What is FFC" = the explainer voice note on how the whole thing works. Fire it after the Step 1 bridge; don't re-explain it in text.
-- "FFC Access Link" = sends their training access/login page. Fire it if they can't find the link.
-- "Proof" = testimonials / student results. Fire it in the green/yellow branch when showing what's possible.
-- "Booking Link" = the call-booking link. Fire it only after they say YES to a call.
-Rule: when you fire an automation, your text must NOT duplicate what that automation already says.
-
-STEP 1 (clean text, no greeting — the Welcome VN already greeted them): "Quick one before we dive in, have you tried building something online before, or is this your first real look into it?"
- - Beginner → "Sure, no worries then you're exactly who this was built for. Most of our best students started from zero. Let me send you a quick voice note so you get how the whole thing works" → then fire What is FFC.
- - Tried before → "Ah nice, so you already know the game. That makes this easier, the part most people get stuck on is the offer, not the tech. Let me send you a quick voice note on how we do it differently" → then fire What is FFC.
- → then: "So have you had a chance to watch the first video of the training yet?"
-
-STEP 2 "WHY NOW": "why now? what changed recently that made you go 'ok, I need to figure this out' this month rather than next year?"
- - Not watched the video → "no worries! it's only 10 min and everything after makes way more sense once you've seen it 🙌 while you get to it, why now?"
- ACKNOWLEDGE their answer in THEIR words, one line. Never the generic "wake up whenever you want" line.
-
-STEP 3: respond to their WHY NOW (acknowledge + next question in ONE message), goal = learn (1) their situation (working / own business / in between) and (2) have they invested in help before + what was missing.
- - "have you tried anything before to get out of it, a course/coaching, or is this your first real go?"
- - If burned/scammed before → "what was missing last time - the info, or the support after you invested?"
- - support/doing-it-alone was missing → "so it wasn't the info, it was doing it alone — that's exactly who this works best for."
-
-STEP 4 — THE GATE (EVERY LEAD, BEFORE ANY LINK): "If we walked you through how our team can shortcut all this for you, and it felt like the right fit, are you in a position to invest in that right now, or would it be more of a future thing?"
-
-🟢 GREEN (yes / would find a way / open): goal+proof → "let's get you moving 👌 you said you want [their thing], let me show you what that looks like" [Proof] → plan+ask: "we build your site, load proven products, set up your first ad so you're selling in days not months. Our Head Coach can walk you through it on a quick call — want me to grab you a spot this week?" → on YES → send Booking Link.
-🟡 YELLOW (future / not sure / just curious → NO link yet; never say "no pressure"): ISOLATE "is it more the investment side, or more that you're not sure this'd actually work for you?" → answer ONCE by type (price-with-income: "if the investment wasn't a factor, would you actually want to do this?"; price-no-income: value first, max 3 msgs, never a number; fit/doubt: "what would make this a yes for you?"; time: "will next month really be less busy? we build it so it doesn't eat your week"; partner: "if you asked them today would you say it's the right move?") → PROOF + proposal → "want me to grab you a spot this week?" → YES → Booking Link.
-🔴 RED (hard no money for now → no call/proof/link): ONE message — "no worries 🙏 then the right move right now is the challenge, not Elite. You've got the training + products, get first sales on your own, I'm here for questions. When you're in a better spot, reach back and we'll set up the call. I'll check in on [date] 🙌"`;
+// ===== THE SCRIPT = the whiteboard flow tree (single source of truth) =====
+// Exported from flow.html "Export tree" → stored in the __sim_tree__ row. The old hardcoded
+// condensed doc is GONE — the AI reads the live tree so it always matches the whiteboard.
+const VN_TRANSCRIPTS = {
+  'Welcome VN': "Hey, it's Paul here. I caught you just as I was walking in the door, so I thought I'd send you a quick voice note. Just wanted to say congrats on joining the challenge. I'm excited to connect with you and help you get started. So yeah, let's dive in and get you to that first sale.",
+  'What is FFC': "So, the system is super, super simple. It's designed to get you up and running and selling digital products on autopilot. To start, we'll get you set up selling done-for-you digital products so you can launch in the shortest time possible. Best part is you keep 100% of the sales without dealing with any fulfillment or needing to create your own product. Your customers get instant access automatically, and if they have issues they contact the course/product creator directly, not you. And just so you're aware, we also offer an option where we can build your website for you, load it with already winning and proven digital products, and even set up your ads so you can start generating guaranteed sales. Hope that makes sense — just let me know if you have any questions.",
+};
+function _nodeBody(n) {
+  const steps = (n.steps && n.steps.length) ? n.steps : (n.text ? [{ t: 'msg', text: n.text }] : []);
+  return steps.map(s => s.t === 'flow' ? `⚡FIRE AUTOMATION: ${s.name}` : s.text).join('  |  ');
+}
+// render the tree into a navigable script the AI follows (blocks + labelled branches)
+function renderTreeScript(tree) {
+  if (!tree || !tree.nodes || !tree.nodes.length) return null;
+  const byId = Object.fromEntries(tree.nodes.map(n => [n.id, n]));
+  const outs = {};
+  (tree.edges || []).forEach(e => { (outs[e.from] = outs[e.from] || []).push(e); });
+  const incoming = new Set((tree.edges || []).map(e => e.to));
+  const entry = tree.nodes.find(n => !incoming.has(n.id)) || tree.nodes[0];
+  let o = 'FFC DM-SETTING SCRIPT — the SINGLE source of truth (the whiteboard flow tree). Follow it exactly; this REPLACES any older script you may have seen.\n\n';
+  if (tree.rules && tree.rules.length) o += 'HARD RULES (override everything, always obey):\n' + tree.rules.map(r => '- ' + r).join('\n') + '\n\n';
+  o += 'VOICE-NOTE AUTOMATIONS — what each already SAYS (never repeat its words in your own text):\n';
+  Object.entries(VN_TRANSCRIPTS).forEach(([k, v]) => { o += `- ${k}: "${v}"\n`; });
+  o += `\nSTART AT block: ${entry.id}\n\nFLOW — each block is a message to send; "→" shows where it branches based on the lead's reply:\n`;
+  tree.nodes.forEach(n => {
+    const kind = n.kind === 'route' ? 'JUNCTION' : (n.kind === 'button' ? 'BUTTON' : 'MSG');
+    o += `\n[${n.id}] (${kind}) ${n.title || ''}\n`;
+    const body = _nodeBody(n);
+    if (body) o += `   ${body}\n`;
+    (outs[n.id] || []).forEach(e => { o += `   → ${e.label ? '"' + e.label + '"' : '(next)'} → [${e.to}] ${(byId[e.to] || {}).title || ''}\n`; });
+  });
+  return o;
+}
+let _scriptCache = { text: null, at: 0 };
+async function getScriptText() {
+  if (_scriptCache.text && Date.now() - _scriptCache.at < 60000) return _scriptCache.text;
+  let tree = null;
+  try { tree = await getSpecial(SIM_TREE_ID, simTreeMem); } catch (e) {}
+  const rendered = renderTreeScript(tree);
+  _scriptCache = { text: rendered, at: Date.now() };
+  return rendered;
+}
+const NO_SCRIPT = 'SCRIPT NOT LOADED — the whiteboard tree has not been exported yet. Tell the user to open /flow.html and click "Export tree".';
 
 // strip internal/system lines (automation narration, placeholders) so the AI reasons on the REAL convo only
 function cleanMsgs(c) {
@@ -267,6 +278,7 @@ async function suggest(c) {
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
     await refreshFlowMap();
     const transcript = transcriptOf(c);
+    const scriptText = (await getScriptText()) || NO_SCRIPT;
     const msg = await client.messages.create({
       model: 'claude-sonnet-5', max_tokens: 500,
       system: `You are Paul, an FFC (Faceless Funnel Challenge) DM setter. Warm, human, concise, never pushy. Goal: follow the script below to qualify the lead and book a call for the $5k Elite.
@@ -279,7 +291,7 @@ OUTPUT FORMAT — reply with ONLY a JSON array of steps, in order, no prose arou
 Use {"fire":"<automation name>"} to fire an automation, {"say":"<message>"} to send a text. Most turns are just one {"say":...}. Fire an automation only where the script calls for it (Welcome VN at the very start, What is FFC after Step 1, FFC Access Link if they can't find it, Proof + Booking Link in the green/yellow branches). Output valid JSON only.
 
 SCRIPT:
-${MAIN_SCRIPT}`,
+${scriptText}`,
       messages: [{ role: 'user', content: `Conversation so far:\n${transcript}\n\nGive the next move as a JSON array of steps, following the script for where this lead is.` }],
     });
     const out = (msg.content.find(b => b.type === 'text') || {}).text || '';
@@ -335,6 +347,7 @@ async function generateFuSuggestion(c, step) {
     const Anthropic = require('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
     const transcript = transcriptOf(c);
+    const scriptText = (await getScriptText()) || NO_SCRIPT;
     const firstName = c.firstName || (c.realName || '').trim().split(/\s+/)[0] || (c.name || '').trim().split(/\s+/)[0] || '';
     const tone = step <= 2 ? 'gentle' : step <= 4 ? 'a bit more direct' : 'a graceful break-up (give them an easy out)';
     const msg = await client.messages.create({
@@ -357,7 +370,7 @@ FU BANK (your ONLY source for the nudge):
 ${FU_BANK}
 
 SCRIPT (reference ONLY — to identify the stage; do NOT copy lines from it):
-${MAIN_SCRIPT}`,
+${scriptText}`,
       messages: [{ role: 'user', content: `The lead's first name is: ${firstName || '(unknown)'} — use it to fill any [name] token (never leave the literal "[name]" in the output; if unknown, drop it).\n\nTranscript so far:\n${transcript}\n\nWrite follow-up #${step}.` }],
     });
     const fuOut = (msg.content.find(b => b.type === 'text') || {}).text || '';
