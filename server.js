@@ -365,6 +365,8 @@ async function suggestV2(c) {
   const { byId } = _treeMaps(tree);
   const entry = _entryNode(tree);
   c.leadProfile = c.leadProfile || {};
+  c.sent = c.sent || new Set();      // node ids already sent — never repeat a block
+  c.stayed = c.stayed || {};         // nodes we've already "stayed"/deflected on once
   const firstMove = !c.messages.some(m => m.dir === 'out');
   let target = null, opener = '', brackets = {}, thought = '', stay = false, holding = '';
   if (firstMove) {
@@ -391,7 +393,7 @@ THE LEAD JUST REPLIED: "${lastIn ? lastIn.text : ''}"
 Decide the next block to send based on how they answered. OPTIONS:
 ${opts.map((o, i) => `${i}. WHEN: ${o.condition}\n   SENDS: "${o.text.slice(0, 160)}"`).join('\n')}
 
-If the lead asked something OFF-SCRIPT that none of the options answer, use "stay": give a SHORT on-brand holding reply (obey hard rules — e.g. deflect price) and we'll re-ask the current step.
+ALWAYS PREFER ADVANCING. If the lead asked about PRICE, put the deflection in the "opener" but STILL pick the forward branch that matches their underlying answer — do NOT stay. Use "stay" ONLY for a genuinely unanswerable non-price aside, and never more than once in a row. Never pick an option whose block was already sent.
 
 Output ONLY JSON:
 {"thought":"<1 line: their intent + why this branch>","choice":<option number, or "stay">,"newFacts":{"<key>":"<value>"},"opener":"<tiny opening acknowledgment or empty, per the verbatim rule>","brackets":{"<exact [bracket] substring from the chosen block>":"<value filled from the lead profile>"},"holdingReply":"<only if choice is stay>"}`;
@@ -407,6 +409,10 @@ Output ONLY JSON:
     if (parsed.newFacts && typeof parsed.newFacts === 'object') Object.assign(c.leadProfile, parsed.newFacts);
     if (parsed.choice === 'stay' || parsed.choice === -1) { stay = true; holding = (parsed.holdingReply || '').trim(); }
     else { const idx = parseInt(parsed.choice, 10); target = (opts[idx] ? byId[opts[idx].id] : byId[opts[0].id]); }
+    // --- loop guards ---
+    if (stay && c.stayed[cur.id]) { stay = false; target = byId[(opts.find(o => !c.sent.has(o.id)) || opts[0]).id]; } // already deflected here → force advance
+    else if (stay) { c.stayed[cur.id] = 1; }
+    if (!stay && target && c.sent.has(target.id)) { const u = opts.find(o => !c.sent.has(o.id)); if (u) target = byId[u.id]; else return { steps: [], empty: true, done: true }; } // never re-send a block
   }
   // compose
   const steps = [];
@@ -420,7 +426,7 @@ Output ONLY JSON:
     if (s.t === 'flow') steps.push({ type: 'flow', name: s.name, flow_ns: flowNsByName(s.name) });
     else { let txt = fillBrackets(s.text, brackets); if (!openerUsed && opener) { txt = opener + ' ' + txt; openerUsed = true; } steps.push({ type: 'message', text: txt }); }
   }
-  c.nodeId = target.id;
+  c.nodeId = target.id; c.sent.add(target.id);
   return { steps, nodeId: target.id, thought, profile: c.leadProfile, confidence: 0.85, empty: !steps.length };
 }
 
