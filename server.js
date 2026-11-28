@@ -929,7 +929,7 @@ app.get('/api/sim-run', (_req, res) => { res.set('Cache-Control', 'no-store'); r
 app.get('/api/sim-debug', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const nodeId = req.query.node || 'b_w';
-  const c = { messages: [{ dir: 'out', text: 'prev', t: 1 }, { dir: 'in', text: req.query.say || 'honestly im just broke, bills piling up and need money fast', t: 2 }], nodeId, mode: 'approve', leadProfile: { urgency: 'broke' }, sent: new Set([nodeId]) };
+  const c = { messages: [{ dir: 'out', text: 'prev', t: 1 }, { dir: 'in', text: req.query.say || 'honestly im just broke, bills piling up and need money fast', t: 2 }], nodeId, mode: 'approve', leadProfile: { urgency: 'broke' }, sent: new Set([nodeId]), pastGate: req.query.pg === '1', addressed: req.query.priced === '1' ? { price: true } : {} };
   try {
     const tree = await getSpecial(SIM_TREE_ID, simTreeMem);
     const diag = { treeLoaded: !!(tree && tree.nodes), nodeCount: tree && tree.nodes ? tree.nodes.length : 0, hasNode: !!(tree && tree.nodes && tree.nodes.find(n => n.id === nodeId)), opts: tree && tree.nodes ? nextOptions(tree, nodeId).map(o => o.id) : [] };
