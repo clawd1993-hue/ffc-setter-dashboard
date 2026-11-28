@@ -377,44 +377,45 @@ async function suggestV2(c) {
     if (!opts.length) return { steps: [], empty: true, done: true }; // terminal reached
     const lastIn = [...c.messages].reverse().find(m => m.dir === 'in');
     const recent = transcriptOf(c).split('\n').slice(-6).join('\n');
-    const sys = `You are Paul, an FFC DM setter running a SCRIPTED flow. Think first, then act.
+    const Anthropic = require('@anthropic-ai/sdk'); const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    // --- CALL A (tiny, near-unbreakable): pick a branch + note facts + opener. NO bracket-filling here. ---
+    const sysA = `You are Paul, an FFC DM setter on a SCRIPTED flow. Decide the ONE next move. Keep it tiny.
 
-HARD RULES (always obey):
+HARD RULES (obey):
 ${(tree.rules || []).map(r => '- ' + r).join('\n')}
 
-WHERE YOU ARE — you just sent this block:
-[${cur.id}] "${_msgText(cur)}"
+You just sent: "${_msgText(cur)}"
+What you know about this lead: ${JSON.stringify(c.leadProfile)}
+The lead just replied: "${lastIn ? lastIn.text : ''}"
 
-LEAD PROFILE so far (facts you've gathered about THIS lead — use these to fill [ ] brackets):
-${JSON.stringify(c.leadProfile)}
+Pick the ONE option that matches how they answered:
+${opts.map((o, i) => `${i}. WHEN ${o.condition} → "${o.text.slice(0, 110)}"`).join('\n')}
 
-THE LEAD JUST REPLIED: "${lastIn ? lastIn.text : ''}"
-
-Decide the next block to send based on how they answered. OPTIONS:
-${opts.map((o, i) => `${i}. WHEN: ${o.condition}\n   SENDS: "${o.text.slice(0, 160)}"`).join('\n')}
-
-ALWAYS PREFER ADVANCING. If the lead asked about PRICE, put the deflection in the "opener" but STILL pick the forward branch that matches their underlying answer — do NOT stay. Use "stay" ONLY for a genuinely unanswerable non-price aside, and never more than once in a row. Never pick an option whose block was already sent.
-
-Output ONLY JSON:
-{"thought":"<1 line: their intent + why this branch>","choice":<option number, or "stay">,"newFacts":{"<key>":"<value>"},"opener":"<tiny opening acknowledgment or empty, per the verbatim rule>","brackets":{"<exact [bracket] substring from the chosen block>":"<value filled from the lead profile>"},"holdingReply":"<only if choice is stay>"}`;
-    const Anthropic = require('@anthropic-ai/sdk'); const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+RULES: ALWAYS advance — pick a numbered option. If they asked about PRICE, put a short deflection in "opener" but STILL pick the forward option. Use "stay" ONLY for a rare unanswerable non-price aside.
+Output ONLY compact JSON: {"choice":<number or "stay">,"opener":"<tiny acknowledgment or empty>","facts":{"<key>":"<value learned this turn>"},"holdingReply":"<only if stay>"}`;
     let parsed = null;
     for (let a = 0; a < 2 && !parsed; a++) {
-      const r = await client.messages.create({ model: 'claude-sonnet-5', max_tokens: 700, system: sys, messages: [{ role: 'user', content: recent + '\n\nDecide the next move. JSON only.' }] }).catch(() => null);
+      const r = await client.messages.create({ model: 'claude-sonnet-5', max_tokens: 250, system: sysA, messages: [{ role: 'user', content: 'Decide. JSON only.' }] }).catch(() => null);
       const txt = r ? ((r.content.find(b => b.type === 'text') || {}).text || '') : '';
       try { const i = txt.indexOf('{'), j = txt.lastIndexOf('}'); parsed = JSON.parse(txt.slice(i, j + 1)); } catch (e) {}
     }
-    if (!parsed) return { steps: [], empty: true };
-    thought = parsed.thought || ''; opener = (parsed.opener || '').trim(); brackets = parsed.brackets || {};
-    if (parsed.newFacts && typeof parsed.newFacts === 'object') Object.assign(c.leadProfile, parsed.newFacts);
+    // INVARIANT: a non-terminal node NEVER dies. If the model failed, keyword-advance instead of ending.
+    if (!parsed) parsed = { choice: _heuristicChoice(lastIn ? lastIn.text : '', opts), opener: '', facts: {} };
+    opener = (parsed.opener || '').trim();
+    if (parsed.facts && typeof parsed.facts === 'object') Object.assign(c.leadProfile, parsed.facts);
     if (parsed.choice === 'stay' || parsed.choice === -1) { stay = true; holding = (parsed.holdingReply || '').trim(); }
-    else { const idx = parseInt(parsed.choice, 10); target = (opts[idx] ? byId[opts[idx].id] : byId[opts[0].id]); }
+    else { let idx = parseInt(parsed.choice, 10); if (isNaN(idx) || !opts[idx]) idx = _heuristicChoice(lastIn ? lastIn.text : '', opts); target = byId[opts[idx].id]; }
     // --- loop guards ---
-    if (stay && c.stayed[cur.id]) { stay = false; target = byId[(opts.find(o => !c.sent.has(o.id)) || opts[0]).id]; } // already deflected here → force advance
+    if (stay && c.stayed[cur.id]) { stay = false; target = byId[(opts.find(o => !c.sent.has(o.id)) || opts[0]).id]; }
     else if (stay) { c.stayed[cur.id] = 1; }
-    if (!stay && target && c.sent.has(target.id)) { const u = opts.find(o => !c.sent.has(o.id)); if (u) target = byId[u.id]; else return { steps: [], empty: true, done: true }; } // never re-send a block
+    if (!stay && target && c.sent.has(target.id)) { const u = opts.find(o => !c.sent.has(o.id)); if (u) target = byId[u.id]; else return { steps: [], empty: true, done: true }; }
+    thought = stay ? 'off-script aside → brief hold, then re-ask' : `→ ${target.id}`;
+    // --- CALL B (only if the chosen block has [ ] brackets): fill them in isolation ---
+    if (!stay && target && /\[[^\]]+\]/.test(_msgText(target))) {
+      brackets = await _fillBracketsAI(client, target, c.leadProfile, lastIn ? lastIn.text : '');
+    }
   }
-  // compose
+  // compose (text always comes from the node → can't be blank)
   const steps = [];
   if (stay) {
     steps.push({ type: 'message', text: (opener ? opener + ' ' : '') + (holding || 'One sec — let me sort that for you.') });
@@ -428,6 +429,24 @@ Output ONLY JSON:
   }
   c.nodeId = target.id; c.sent.add(target.id);
   return { steps, nodeId: target.id, thought, profile: c.leadProfile, confidence: 0.85, empty: !steps.length };
+}
+// keyword-match the lead's reply to the best branch — the "never die" fallback when the model fumbles
+function _heuristicChoice(leadText, opts) {
+  const tw = new Set(_toks(leadText)); let best = 0, bs = -1;
+  opts.forEach((o, i) => { const ow = new Set(_toks(o.condition + ' ' + o.text)); let ov = 0; tw.forEach(w => { if (ow.has(w)) ov++; }); if (ov > bs) { bs = ov; best = i; } });
+  return best;
+}
+async function _fillBracketsAI(client, node, profile, leadText) {
+  const text = _msgText(node); const brs = [...new Set((text.match(/\[[^\]]+\]/g) || []))];
+  if (!brs.length) return {};
+  const sys = `Fill these script placeholders for THIS lead. For a "[a / b / c]" slash-placeholder, pick the ONE that fits.
+Lead profile: ${JSON.stringify(profile)}
+Lead just said: "${leadText}"
+Placeholders: ${JSON.stringify(brs)}
+Output ONLY JSON mapping each exact placeholder string to a short value, e.g. {"${brs[0]}":"..."}.`;
+  const r = await client.messages.create({ model: 'claude-sonnet-5', max_tokens: 300, system: sys, messages: [{ role: 'user', content: 'Fill them. JSON only.' }] }).catch(() => null);
+  const txt = r ? ((r.content.find(b => b.type === 'text') || {}).text || '') : '';
+  try { const i = txt.indexOf('{'), j = txt.lastIndexOf('}'); return JSON.parse(txt.slice(i, j + 1)); } catch (e) { return {}; }
 }
 
 // ---------- Follow-Up suggestion generator (Phase 1) ----------
